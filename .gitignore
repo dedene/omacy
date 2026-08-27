@@ -57,9 +57,13 @@ Carthage/Build/
 # https://docs.fastlane.tools/best-practices/source-control/#source-control
 
 fastlane/report.xml
+fastlane/README.md
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+fastlane/.env
+*.p8
+build/
 
 # Rust
 target/

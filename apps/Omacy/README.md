@@ -6,7 +6,7 @@ Build on macOS 15+ (deployment target 15.0). PaperSaver 0.2.0 needs Swift 6.2, s
 
 ## Run
 
-1. Set a Development Team on both targets.
+1. Team is `25TVW8MSGJ` (Zenjoy). Sync Developer ID profiles with `bundle exec fastlane mac generate_signing` (once) or `mac sync_signing` (readonly).
 2. Build the Omacy scheme.
 3. For iteration, stay in DerivedData **or** copy the app to `/Applications` — not both.
 4. Use the host to register (`pluginkit`) and enable (PaperSaver). Registration from a random path is refused.

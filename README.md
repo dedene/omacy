@@ -26,6 +26,22 @@ Put `Omacy.app` in `/Applications`, then use the host to register the extension 
 
 Configuration (paste art, PNG/SVG conversion, effect, restore default) lives in the host and writes App Group `group.be.zenjoy.omacy`.
 
+## Signing
+
+Developer ID uses Zenjoy team `25TVW8MSGJ` and the same match repo as Zentty (`zentty-certificates`). Profiles:
+
+- `match Direct be.zenjoy.omacy macos`
+- `match Direct be.zenjoy.omacy.screensaver macos`
+
+```
+bundle exec fastlane mac generate_signing   # once, or to renew
+bundle exec fastlane mac sync_signing       # readonly install
+bundle exec fastlane mac archive            # Developer ID export
+bundle exec fastlane mac notarize_app
+```
+
+Env: copy `fastlane/.env.example` or reuse Zentty’s 1Password item (`Zentty Release Environment`).
+
 ## Credits
 
 The motion is [Terminal Text Effects](https://github.com/ChrisBuilds/terminaltexteffects) by ChrisBuilds, running on [ttfx](https://github.com/omacom-io/ttfx), the Rust port Omarchy ships. Both are MIT. The Linux wrapper this copies is [Omarchy](https://github.com/basecamp/omarchy), also MIT. The bundled font is Fairfax HD by Kreative Software, SIL OFL.

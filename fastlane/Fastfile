@@ -1,0 +1,128 @@
+require "json"
+require "open3"
+
+default_platform(:mac)
+
+APP_NAME     = "Omacy"
+SCHEME       = "Omacy"
+PROJECT      = "apps/Omacy/Omacy.xcodeproj"
+BUILD_DIR    = "build/release"
+APP_PATH     = "#{BUILD_DIR}/#{APP_NAME}.app"
+PROJECT_ROOT = File.expand_path("..", __dir__)
+BUNDLE_IDS   = [
+  "be.zenjoy.omacy",
+  "be.zenjoy.omacy.screensaver"
+].freeze
+
+def capture_command!(*args, chdir: PROJECT_ROOT, error_message: nil)
+  stdout, stderr, status = Open3.capture3(*args, chdir: chdir)
+  return stdout if status.success?
+
+  message = error_message || "Command failed: #{args.join(" ")}"
+  message += "\n#{stderr.strip}" unless stderr.strip.empty?
+  UI.user_error!(message)
+end
+
+def hydrate_release_env_from_one_password!
+  return if defined?(@release_env_loaded) && @release_env_loaded
+
+  @release_env_loaded = true
+  ENV["OP_RELEASE_ENV_ITEM"] = "Zentty Release Environment" if ENV["OP_RELEASE_ENV_ITEM"].to_s.strip.empty?
+  ENV["OP_RELEASE_ENV_VAULT"] = "Engineering" if ENV["OP_RELEASE_ENV_VAULT"].to_s.strip.empty?
+  item = ENV["OP_RELEASE_ENV_ITEM"].to_s.strip
+  return if item.empty?
+
+  args = ["op", "item", "get", item, "--format", "json", "--reveal"]
+  vault = ENV["OP_RELEASE_ENV_VAULT"].to_s.strip
+  args += ["--vault", vault] unless vault.empty?
+  payload = JSON.parse(capture_command!(*args, error_message: "Failed to read release env from 1Password"))
+
+  Array(payload["fields"]).each do |field|
+    next if field["purpose"] == "PASSWORD" || field["purpose"] == "NOTES"
+
+    key = field["label"] || field["id"]
+    env_key = key.to_s.strip.upcase.gsub(/[^A-Z0-9]+/, "_").gsub(/\A_+|_+\z/, "")
+    next if env_key.empty?
+
+    value = field["value"].to_s
+    next if value.empty?
+
+    ENV[env_key] = value if ENV[env_key].to_s.empty?
+  end
+end
+
+def required_env!(name)
+  hydrate_release_env_from_one_password!
+  value = ENV[name].to_s.strip
+  UI.user_error!("#{name} must be set") if value.empty?
+  value
+end
+
+def resolve_asc_key_filepath
+  path = required_env!("ASC_KEY_FILEPATH")
+  candidates = [
+    path,
+    File.expand_path(path, PROJECT_ROOT),
+    File.expand_path(path, File.join(PROJECT_ROOT, "fastlane")),
+    File.expand_path(File.join("..", "zentty", path), PROJECT_ROOT),
+    File.expand_path(File.join("..", "zentty", "fastlane", File.basename(path)), PROJECT_ROOT)
+  ]
+  hit = candidates.find { |candidate| File.file?(candidate) }
+  UI.user_error!("ASC_KEY_FILEPATH not found: #{path}") unless hit
+  hit
+end
+
+def load_api_key
+  app_store_connect_api_key(
+    key_id: required_env!("ASC_KEY_ID"),
+    issuer_id: required_env!("ASC_ISSUER_ID"),
+    key_filepath: resolve_asc_key_filepath
+  )
+end
+
+def sync_signing!(readonly:)
+  required_env!("MATCH_PASSWORD")
+  match(
+    type: "developer_id",
+    platform: "macos",
+    app_identifier: BUNDLE_IDS,
+    readonly: readonly,
+    api_key: load_api_key
+  )
+end
+
+platform :mac do
+  desc "Create or update Developer ID profiles in the shared match repo"
+  lane :generate_signing do
+    sync_signing!(readonly: false)
+  end
+
+  desc "Install Developer ID cert + profiles (readonly)"
+  lane :sync_signing do
+    sync_signing!(readonly: true)
+  end
+
+  desc "Archive and export with Developer ID signing"
+  lane :archive do
+    sync_signing!(readonly: true)
+    build_mac_app(
+      project: PROJECT,
+      scheme: SCHEME,
+      configuration: "Release",
+      clean: true,
+      output_directory: BUILD_DIR,
+      output_name: APP_NAME,
+      export_method: "developer-id",
+      export_options: "fastlane/ExportOptions.plist"
+    )
+  end
+
+  desc "Notarize the exported .app"
+  lane :notarize_app do
+    notarize(
+      package: APP_PATH,
+      api_key: load_api_key,
+      print_log: true
+    )
+  end
+end
