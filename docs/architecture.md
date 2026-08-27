@@ -2,218 +2,202 @@
 
 macOS screensaver that replays Omarchy’s ASCII text-effects loop: a logo (or any text), animated by the 37 Terminal Text Effects, hosted as a real System Settings screensaver.
 
-Stack: **Rust `ttfx` engine → zero-copy cell grid → Swift/Metal view → Aerial-style host app + `.appex`.**
+Stack: **patched `ttfx` → C ABI cell grid → Metal renderer → host app + `.appex`.**
 
-This document is the design. Implementation follows only after it is accepted.
+Revision 2 of this design. Implementation starts only after this revision is accepted.
+
+Companion contracts: [ffi.md](ffi.md) (ABI, threading, occupancy, origin) and [parity.md](parity.md) (pins, clock, 37-effect matrix).
 
 ## Goal
 
-When the Mac idles, every display shows the same kind of thing Omarchy shows: a centered ASCII/Braille logo, black field, a random (or chosen) `ttfx` effect, then the next one. In System Settings the user can paste art, generate it from a PNG/SVG, and pick effects.
+When the Mac idles, every connected display runs a `ttfx` effect on a centered ASCII/Braille logo against a black field, then the next effect. Speed is the same on a 60 Hz display and a 120 Hz ProMotion display.
 
-It should feel identical to Omarchy, not “inspired by.” Same effect catalog, same motion, same image→Braille conversion. Font and cell size are the only allowed visual drift, and both are configurable.
+Configuration lives in the **host app**: paste art, generate art from a PNG/SVG, pick an effect or random, restore the default wordmark. System Settings shows the saver, its thumbnail, and (later) a thin sheet for effect choice — not the image converter. The converter needs `NSOpenPanel`; the appex sandbox did not present that panel.
 
-## Non-goals
+Fidelity is **measured**, not vibed. Motion is cell-grid identity against pinned `ttfx` for all 37 effects. Image conversion is byte identity against goldens produced by pinned Omarchy `omarchy-transcode-ascii`. Font rasterization is allowed to differ. See [parity.md](parity.md).
 
-- Wrapping a terminal emulator or spawning the `ttfx` CLI. The screensaver host is sandboxed; that Linux architecture does not port.
+## Non-goals (MVP)
+
+- Wrapping a terminal or spawning the `ttfx` CLI.
 - Reimplementing the 37 effects.
-- Legacy `.saver` bundles as the shipping format.
-- Wallpaper-continuity / lock-screen stills (Apple’s private wallpaper API). Preview-in-app is enough.
-- Python TTE, ImageMagick, or any runtime interpreter.
+- Legacy `.saver` as the shipping format.
+- Wallpaper-continuity / lock-screen stills.
+- Python TTE, ImageMagick at runtime, effect exclude-lists, per-effect knobs.
+- Filesystem watchers. Settings reload at session start and at effect boundaries only.
+- A separate `omacy-ascii` crate. Conversion stays an internal engine module until a second consumer exists.
+- A worker-thread renderer. Tick stays on the display-link thread until Instruments says otherwise.
 
 ## Locked decisions
 
 | Decision | Choice | Why |
 |---|---|---|
-| Host | Host `.app` + `com.apple.screensaver` `.appex` | Same path Aerial 4 uses; `.saver` is rotting on Tahoe |
-| Engine | Vendor `omacom-io/ttfx`, patch, don’t rewrite | Already a macOS-tested lib; byte-identical to TTE v0.15.0 |
-| Frame contract | C ABI, packed cell buffer, no UniFFI | Zero-copy into Metal; UniFFI would serialize every cell |
+| Host | Host `.app` + `com.apple.screensaver` `.appex` | Aerial 4 path; `.saver` is rotting on Tahoe |
+| Canary | Signed appex with a fixed grid, before the engine | Private API is the product risk; a preview app is not the product |
+| Engine | Vendor `ttfx`, patch, don’t rewrite | Byte-identical to TTE v0.15.0; already builds on macOS |
+| Frame contract | C ABI, packed cells, no UniFFI | Zero-copy upload; UniFFI would serialize every cell |
+| Occupancy | Background and glyph are independent flags | A blank glyph can still carry a background |
+| Origin | Top-left, rows increase downward | Terminal-internal order is not the ABI |
+| Simulation | Fixed 60 Hz steps, vsync presents | Speed must not track the display |
 | Draw path | Metal glyph atlas + instanced quads | Core Text per cell per frame would dominate CPU |
-| Timing | `CADisplayLink`, `ttfx` frame-sleep off | Vsync, not a 120 fps tty sleep |
-| Settings | App Group container | Host app and appex are different processes |
-| Image convert | Pure Rust, once at config time | Matches Omarchy’s braille/block script; no `magick` |
-| OS floor | macOS 15 (Sequoia); develop on 26 | Appex exists since Sonoma; Peter is on Tahoe |
-| Displays | One engine session per `ScreenSaverView` | Omarchy launches one `ttfx` per monitor |
+| Display link | `NSView.displayLink(target:selector:)` | AppKit API; not a UIKit window-scene link |
+| Settings | App Group; reload at start + effect boundary | Host and appex are different processes; no kqueue |
+| Image convert | Internal engine module, host-only UI | One consumer; `NSOpenPanel` is in the app |
+| Effect pool | All 37, no excludes | Matches current Omarchy `omarchy-screensaver` |
+| OS floor | macOS 15; develop on 26 | Appex since Sonoma; Peter is on Tahoe |
+| Displays | One session per saver view | Omarchy launches one `ttfx` per monitor |
 
-Private API risk is accepted: `ScreenSaverExtension` / ExtensionKit screensaver point is undocumented. The host app’s preview window uses the same renderer and remains usable if Apple breaks registration.
+Private API is accepted and **gated**. If the canary does not appear in System Settings, activate on idle, and paint every display on macOS 26 (and 15 when we have a box), we stop. The host preview remains a fallback product, not a substitute for the gate.
 
 ## System shape
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Omacy.app                                                  │
-│  SwiftUI: preview, install/enable, full config              │
-│                                                             │
-│  Contents/PlugIns/Omacy.appex  ──►  ScreenSaverEngine /     │
-│  ScreenSaverExtension + View        WallpaperAgent          │
-└──────────────┬──────────────────────────┬───────────────────┘
-               │                          │
-               │  OmacyRenderer (shared)  │
-               │  GridView + Metal + Settings
-               ▼                          ▼
-        omacy_engine.dylib / staticlib (Rust)
-               │
-               ├─ Session (tick → grid)
-               ├─ ttfx (vendored)
-               └─ omacy-ascii (PNG/SVG → Braille/block)
+Omacy.app  (SwiftUI chrome: preview, install/enable, config)
+  Preview:  NSView  ──► OmacyRenderer
+  PlugIns/Omacy.appex
+    ScreenSaverView ──► OmacyRenderer ──► ScreenSaverEngine / WallpaperAgent
+
+OmacyRenderer
+  layout → session.step(elapsed) → Metal upload
+       │
+       ▼
+libomacy_engine.a   (serialized session, 60 Hz accumulator)
+       ├─ vendored ttfx
+       └─ ascii module (PNG/SVG → text; host config only)
 ```
 
-Three processes can draw:
+`OmacyRenderer` is a controller, not a view. It owns the Metal stack, the session pointer, layout math, and the display-link target. Two views compose it:
 
-1. **Host preview** — ordinary app window. Always works. Primary development surface.
-2. **System Settings thumbnail/preview** — appex, `isPreview ≈ true`. Cheap: 30 fps, no atlas rebuild storms.
-3. **Idle fullscreen** — one appex view per display, vsync, full quality.
+- `OmacyHostView: NSView` — in-app preview.
+- `OmacySaverView: ScreenSaverView` — appex.
 
-All three instantiate the same `OmacyGridView`.
+They do not share a view subclass. They share the renderer.
+
+Three drawing contexts:
+
+1. **Host preview** — ordinary window. Always works. Engine development surface.
+2. **System Settings preview** — appex, small bounds. Same font size as fullscreen, so fewer cells; presentation capped at 30 Hz.
+3. **Idle fullscreen** — one saver view per display, vsync, full quality.
 
 ## Repo layout
 
 ```
 omacy-screensaver/
-  apps/Omacy/                 Xcode: host + appex + shared renderer
-  crates/
-    omacy-engine/             session, FFI, links ttfx
-    omacy-ascii/              image → text (no ttfx dep)
-  vendor/ttfx/                git submodule, pinned commit + our patches
+  apps/Omacy/              Xcode: host + appex + OmacyRenderer
+  crates/omacy-engine/     session, FFI, ascii module, links ttfx
+  vendor/ttfx/             git submodule, pinned commit + our patches
   assets/
-    branding/screensaver.txt  default Omarchy wordmark
-    fonts/                    bundled OFL monospace with full Braille
-  docs/architecture.md        this file
+    branding/screensaver.txt
+    fonts/                 OFL monospace with full Braille
+    fixtures/              conversion + grid-parity goldens
+  docs/
+    architecture.md
+    ffi.md
+    parity.md
 ```
 
-Xcode does not compile Rust ad hoc in the appex. A build phase runs `cargo build --release` for `aarch64-apple-darwin` (universal later) and links `libomacy_engine.a`. `cbindgen` emits `OmacyEngine.h`.
+Xcode does not compile Rust ad hoc in the appex. A build phase runs `cargo build --release --target aarch64-apple-darwin` and links `libomacy_engine.a`. `cbindgen` emits the header in [ffi.md](ffi.md).
 
-## Engine: adapting ttfx
+## Simulation clock
 
-`ttfx` is already a library (`src/lib.rs`) plus CLI. Effects implement:
+`ttfx` advances one effect step per `advance`/`next_frame`. Its `--frame-rate` only sleeps. Calling `advance` once per display callback therefore runs most effects at the display’s Hz.
 
-```rust
-fn build(&mut self, ctx: &mut EngineCtx) -> Result<(), EngineError>;
-fn next_frame(&mut self, ctx: &mut EngineCtx) -> Option<String>;
-```
+**Contract:** simulation is 60 Hz, the TTE/ttfx default, independent of presentation.
 
-`next_frame` ticks physics then `Terminal::get_formatted_output_string()`, which walks the dense `render_cells` buffer and emits ANSI. The cell buffer is the thing we want. `CharacterVisual` already has `symbol`, `colors`, and style flags *beside* the precomputed SGR string.
+Omarchy’s screensaver passes `--frame-rate 120`. That is a recorded divergence: we will not run twice as fast on ProMotion, and we will not run half speed on a 60 Hz panel. Wall-clock-gated effects (`matrix`, `thunderstorm`) keep `Clock::real()`.
 
-### Patches in `vendor/ttfx`
+The accumulator lives **in the engine**, not in Swift:
 
-Keep them small and upstreamable.
+- `step(elapsed_seconds)` adds `elapsed` to an accumulator.
+- While accumulator ≥ 1/60 s and steps this call < 4: `advance` once, subtract 1/60 s.
+- If the cap is hit, drop leftover accumulator (no spiral after a stall).
+- Publish the current grid even when zero advances ran (120 Hz presents the same step twice).
+- Negative, NaN, or infinite `elapsed` is `OMACY_ERR_INVALID_ARG`.
+- `ttfx` tty sleep and SIGWINCH are off. Canvas size is explicit (`ignore_terminal_dimensions`, centered anchors).
 
-1. **`Terminal::fill_grid(&mut self, out: &mut [Cell])`** — after `update_render_cells()`, write glyph + RGBA + flags. No SGR, no `String`.
-2. **`Effect::advance`** — tick without formatting. `next_frame` becomes `advance` + `get_formatted_output_string` so the CLI stays byte-identical.
-3. **Disable tty pacing and SIGWINCH** when constructed for a GUI session. We size the canvas ourselves (`ignore_terminal_dimensions = true`, `canvas_width/height` in cells, `anchor-canvas c`, `anchor-text c`).
-4. **Default-config constructors** reachable without clap. `EffectCommand::build_effect` already does this; expose `from_name("beams")` that builds with struct defaults.
+## Engine patches (`vendor/ttfx`)
 
-Do not fork the effect files. Do not change RNG, easing, or painter order. Parity suites in `vendor/ttfx` stay green.
+Small, upstreamable, parity suites stay green.
 
-### Our session (`omacy-engine`)
+1. `Terminal::fill_grid` — occupancy + glyph + RGBA from `render_cells`. No SGR. Map ttfx’s terminal row order into ABI top-left (see [ffi.md](ffi.md)).
+2. `Effect::advance` — tick without formatting. `next_frame` = `advance` + `get_formatted_output_string`.
+3. GUI construction path: no tty pacing, no SIGWINCH.
+4. `from_name("beams")` with struct defaults; no argv.
 
-```text
-create(ascii, cols, rows, effect | random, seed?)
-resize(cols, rows)        → rebuild EngineCtx (Omarchy SIGWINCH path)
-tick() -> Grid            → advance + fill_grid, borrowed until next tick
-is_complete() -> bool     → start the next random effect, Omarchy loop
-destroy()
-```
+Do not fork effect files. Do not change RNG, easing, or painter order.
 
-On completion, pick the next effect the way Omarchy does: random from the 37, optional exclude list (Omarchy currently excludes `dev_worm` in some trees; we default to *all 37*, configurable).
-
-Clock: `Clock::real()`. Matrix and thunderstorm are wall-clock gated; matching Omarchy means real time, not a virtual 120 fps clock. Frame delivery is vsync; a tick that finishes early waits for the display link, a tick that overruns drops to the next vsync (never sleep inside Rust).
-
-## FFI
-
-No UniFFI. One C header, `#[repr(C)]`, session pointer.
-
-```c
-typedef struct {
-  uint32_t glyph;     /* Unicode scalar; 0 = empty */
-  uint8_t  fg_r, fg_g, fg_b, fg_a;
-  uint8_t  bg_r, bg_g, bg_b, bg_a;
-  uint8_t  flags;     /* bit0 bold, bit1 italic, bit2 underline, bit3 reverse */
-  uint8_t  _pad[3];
-} OmacyCell;          /* 16 bytes */
-
-typedef struct {
-  uint32_t cols;
-  uint32_t rows;
-  const OmacyCell *cells; /* row-major, valid until next tick/destroy */
-} OmacyFrame;
-
-OmacySession *omacy_session_create(const OmacyConfig *cfg);
-int           omacy_session_resize(OmacySession *, uint32_t cols, uint32_t rows);
-int           omacy_session_tick(OmacySession *, OmacyFrame *out);
-void          omacy_session_destroy(OmacySession *);
-```
-
-`tick` returns `1` if `out` is filled, `0` if the effect finished (caller creates a new session or we auto-advance inside — auto-advance inside, so Swift always gets a frame). Empty cells are `glyph = 0`; Metal skips them.
-
-Swift overlay: `OmacySession` class, `tick() -> OmacyFrame` with an `UnsafeBufferPointer<OmacyCell>`. No copy.
-
-ASCII transcode is a separate pair of C functions (`omacy_ascii_from_png`, `_from_svg`) used only by the host app’s config UI, not by the hot path.
+On effect completion the session starts the next effect (random from all 37, or the pinned name) **before** `step` returns. Swift always receives a grid on success. Completion is not an FFI return code.
 
 ## Renderer
 
-`OmacyGridView: NSView` (`wantsLayer = true`). Shared by host preview and appex.
+Layout, from view bounds in **points** and the backing scale factor:
 
-**Layout.** From `bounds` (points) and backing scale:
+- Cell height = configured font size (default 18 pt, Omarchy’s screensaver override).
+- Cell width = advance of `M` in the bundled font.
+- `cols = floor(viewWidth / cellWidth)`, `rows = floor(viewHeight / cellHeight)`, both ≥ 1, both capped (see Limits).
+- `cols * rows` uses checked multiplication; overflow is a failed resize, last grid kept.
+- Remainder is black margin; the grid is centered.
+- If `cols,rows` change after a 50 ms debounce, `resize` (invalidates the frame pointer).
 
-- cell height = chosen font size (preview may scale down)
-- cell width = glyph advance of `M` in the bundled font (monospace, so one value)
-- `cols = floor(width / cellWidth)`, `rows = floor(height / cellHeight)`
-- integer leftover becomes black margin; the grid is centered in the view
-- on `layout` / `viewDidMoveToWindow`, if `cols,rows` changed → `session.resize`
+Preview uses the **same 18 pt**. Smaller bounds ⇒ fewer cells. Do not shrink the preview font: that would increase cell count.
 
-Tahoe can hand the screensaver view backing pixels instead of points. Use `convertToBacking` / `window?.backingScaleFactor` and treat a jump of 2× as scale, not a huge canvas.
+Tahoe may hand backing pixels as the view’s `bounds`. Compare `convertToBacking` / `backingScaleFactor` and treat an exact 2× jump as scale, not a giant canvas.
 
-**Metal.**
+Metal:
 
-1. Build a **glyph atlas** once (and on font-size change): rasterize every distinct scalar seen in the current ASCII *plus* the Braille block `U+2800…U+28FF` *plus* ASCII printable. Core Text → `MTLTexture` (R8 or RG for coverage).
-2. Each frame: walk the cell buffer, skip `glyph == 0`, write an instance (`uv rect, position, fg, bg`) into a triple-buffered `MTLBuffer`.
-3. Draw two instanced quads per occupied cell: background then coverage-modulated foreground. Reverse flag swaps fg/bg.
-4. Clear color = session background (`#000000` default).
+1. Atlas once per font size: printable ASCII, Braille `U+2800…U+28FF`, block drawing used by conversion. Extra glyphs from effects rasterize lazily up to the atlas cap; beyond that, draw background only.
+2. Each presented frame: walk cells. If `has_background`, instance a bg quad. If `has_glyph` and the glyph has coverage, instance a fg quad. `SPACE` with a background draws bg only. Unoccupied cells are skipped (clear color shows). Reverse swaps fg/bg.
+3. Clear color = session background (`#000000`).
+4. Triple-buffered instance storage. Upload **during** `step`’s return, before any other session call.
 
-Atlas misses (rare, a new particle glyph): rasterize that scalar on the next frame, don’t stall the current one — draw a space.
+Display link: `NSView.displayLink(target:selector:)` scheduled on the current run loop. Appex `SSENeedsAnimationTimer = false`. Start when the view has a window (`viewDidMoveToWindow`, `startAnimation`); invalidate on nil window, `stopAnimation`, `deinit`, and `com.apple.screensaver.willstop`. Preferred frame rate: fullscreen max (60–120), Settings preview 30 Hz.
 
-**Do not** use SwiftUI for the grid. SwiftUI is fine for the host chrome and the configuration sheet. Aerial’s warning about `NSHostingView` vs screensaver lifecycle stands; the pixels go through Metal.
+`CAMetalDisplayLink` is a measured alternative, not the default.
 
-**Display link.** `CADisplayLink` attached to the view’s window scene. Appex Info.plist: `SSENeedsAnimationTimer = false`. `startAnimation` / `viewDidMoveToWindow(window != nil)` starts the link; `stopAnimation` / window-nil invalidates it. Preview caps at 30 Hz.
+No SwiftUI in the grid. Chrome and the config sheet may use SwiftUI. The sheet is not inside the saver view.
 
-## Host app and appex
+## Appex canary (go / no-go)
 
-Follow `AerialScreensaver/AppexSaverMinimal` for wiring, not Aerial’s production tree.
+Before vendoring `ttfx` into the appex, ship a signed minimal host+appex derived from [AppexSaverMinimal](https://github.com/AerialScreensaver/AppexSaverMinimal).
 
-| Piece | Class | Notes |
-|---|---|---|
-| Principal | `OmacyExtension: ScreenSaverExtension` | `NSExtensionPointIdentifier = com.apple.screensaver` |
-| View controller | `OmacyViewController: ScreenSaverViewController` | `loadView` creates `OmacyGridView` |
-| View | `OmacyGridView: ScreenSaverView` | Metal + session |
-| Config sheet | `OmacyConfigController` | SwiftUI hosted *in the sheet*, not in the saver view |
-| Host app | SwiftUI | Preview, install, full settings |
+The canary renderer draws a **fixed** grid (asymmetric fixture: a known glyph in the top-right cell, a colored blank in the bottom-left). No `ttfx`, no config, no image loader.
 
-Registration: `pluginkit -a` on the embedded appex (host “Install” button). Activation: PaperSaver `setScreensaverEverywhere(module: "Omacy")` behind “Enable as Screensaver”. Ship the app to `/Applications/Omacy.app`. One install location per machine — mixing DerivedData and `/Applications` makes PlugInKit sticky; debug from one place.
+Acceptance, all required:
 
-Thumbnails: landscape `107×65` / `214×130` in `thumbnail.imageset`. Square assets vanish in System Settings.
+| Check | Pass |
+|---|---|
+| Install | Host copies/registers the app; one location (`/Applications` or DerivedData, never both) |
+| Discover | Listed with first-party savers in System Settings, not only under Other |
+| Thumbnail | Landscape 107×65 / 214×130 |
+| Enable | PaperSaver `setScreensaverEverywhere` and Settings both work |
+| Idle | Activates on idle on the development Mac (macOS 26) |
+| Multi-display | Every connected display paints the fixture |
+| Teardown | `willstop` / window-nil drops Metal; no leak after open/close Settings ten times |
+| Uninstall | `pluginkit -r`, app removed, saver gone from Settings after relaunch |
+| Recovery | Host reports a missing/unelected appex and offers re-register |
+| Version | Repeat idle + Settings on macOS 15 when a box exists; document if deferred |
 
-Bundle IDs:
+Fail the gate: do not spend further effort on engine-in-appex. Keep the host preview path.
 
-- App: `be.zenjoy.omacy`
-- Appex: `be.zenjoy.omacy.screensaver`
-- App Group: `group.be.zenjoy.omacy`
+## Install, update, failure
 
-Signing: Developer ID, notarize the `.app` zip, staple the app. The appex is signed as part of the host.
+- **Install:** `/Applications/Omacy.app`. `pluginkit -a` on the embedded appex. Host “Install” button. Ad-hoc sign for local canary; Developer ID + notarize before any other machine.
+- **Enable:** PaperSaver + a Settings instruction. Record which displays were set.
+- **Update:** replace the app in the same path, re-register. PlugInKit sticks to `/Applications` if both copies exist.
+- **Uninstall:** unregister, delete the app. Offer to wipe the App Group.
+- **Failure:** last-known-good `settings.json` + `screensaver.txt` (write temp, `rename`). Invalid files fall back to bundled defaults and surface an error in the host. A dead session (`OMACY_ERR_PANIC`) is destroyed and recreated with last-known-good.
 
 ## Settings
 
-Persisted in the App Group container, not `ScreenSaverDefaults` alone (the host app is not the legacyScreenSaver container).
+App Group `group.be.zenjoy.omacy`:
 
 ```
-group.be.zenjoy.omacy/
-  screensaver.txt          current art
-  settings.json            see below
+screensaver.txt
+settings.json
 ```
 
 ```json
 {
   "effect": "random",
-  "exclude": [],
   "fontSize": 18,
   "asciiMode": "braille",
   "threshold": 50,
@@ -222,102 +206,89 @@ group.be.zenjoy.omacy/
 }
 ```
 
-`effect` is `"random"` or a `ttfx` name. Font size 18 matches Omarchy’s Ghostty/Kitty screensaver override.
+No `exclude` key in MVP. `effect` is `"random"` or a `ttfx` name.
 
-The host app is the real editor (file picker, live preview, threshold slider). The System Settings sheet is the same SwiftUI form in a narrower window. Saving writes the App Group; a running session observes with `NSFileCoordinator` / a dispatch source and rebuilds at the next effect boundary (not mid-frame).
+The session is created with a config directory path. It reads and validates those files at **create** and when an effect completes, before starting the next. Failed reads keep the in-memory last-known-good. No dispatch source, no `NSFileCoordinator` watcher.
 
-Logo files: convert in the host, store *text*. The appex never opens the original image, so we don’t fight security-scoped bookmarks from a sandbox that didn’t show the open panel.
+Image import, threshold, invert, mode, and paste-from-text run in the host app. Saving writes the App Group and, if a preview session exists, `set_next_config` / recreate. The System Settings sheet, when added, can change `effect` and restore default art only.
 
 ## Image → ASCII
 
-Port `omarchy-transcode-ascii` (ImageMagick + awk) into `omacy-ascii`. Byte-for-byte isn’t required; visual match is.
+Internal module of `omacy-engine`. Host config UI calls it through the FFI text allocators in [ffi.md](ffi.md). The appex never sees image bytes.
 
-Pipeline:
+Pipeline matches pinned `omarchy-transcode-ascii`: alpha-or-luma, invert, trim, resize (braille `w*2 × h*4`, block `w × h*2`), threshold, pack. Goldens are byte-identical to that script on `assets/fixtures/` — not a “visual match.”
 
-1. Decode PNG (`image`) or SVG (`resvg` → raster).
-2. If alpha range is useful, use alpha; else luma. `--invert` flips the sense.
-3. Trim empty borders (optional, default on).
-4. Resize to `width*2 × height*4` (braille) or `width × height*2` (block).
-5. Threshold (default 50%).
-6. Pack: Braille dots in the same 2×4 bit order as Omarchy (`U+2800 + mask`), or `█▀▄ `.
+SVG: `resvg` with **no** external resources, scripts, network, file references, or external fonts.
 
-CLI in the host is unnecessary; the config UI calls the crate via FFI. Keep a `cargo test` fixture against a few logos so the bit masks don’t drift.
+## Resource limits
 
-Default art: vendor Omarchy’s wordmark into `assets/branding/screensaver.txt` (MIT). “Restore default” copies it back.
+All checked with `checked_mul` / explicit length tests. Breach → `OMACY_ERR_LIMIT`, no allocation of the huge object, last-known-good kept.
 
-**Font.** Bundle a SIL-OFL monospace with a complete Braille block. Candidate: JetBrains Mono NL (no ligatures) or Iosevka Term. SF Mono’s Braille is not good enough as the only option; system fonts can be a fallback picker later.
+| Resource | Cap |
+|---|---|
+| ASCII input bytes | 64 KiB |
+| ASCII lines | 128 |
+| ASCII columns (longest line) | 256 |
+| Grid width or height | 512 |
+| Grid cells (`cols * rows`) | 32_768 |
+| PNG / SVG file bytes | 8 MiB / 2 MiB |
+| Decoded pixels | 4_194_304 (2048²) |
+| SVG elements | 8_192 |
+| Atlas glyphs beyond preload | 256 |
+
+Preload is ASCII `0x20–0x7E` + Braille block + conversion block characters. Particle glyphs that miss the atlas after the cap draw background only.
 
 ## Lifecycle
 
-Known host bugs we design around (Tahoe / `legacyScreenSaver` / WallpaperAgent):
+- `stopAnimation` may not run on Tahoe. Also stop in `deinit`, nil window, and `com.apple.screensaver.willstop`.
+- Settings preview can leak views. `OmacyRenderer.stop` drops Metal and `omacy_session_destroy`.
+- After a rebuild, re-register; `killall ScreenSaverEngine` is a documented dev hammer.
 
-- `stopAnimation` may not run. Also stop in `deinit`, `viewDidMoveToWindow` (nil window), and `com.apple.screensaver.willstop`.
-- Preview instantiates extra views and may leak them. `OmacyGridView.stop` must drop the Metal stack and the Rust session. Don’t rely on `NSHostingView`.
-- After a rebuild, PlugInKit may keep serving the old binary. Host “Install” re-registers; document `killall -9 ScreenSaverEngine` for dev.
-
-Resize: debounce 50 ms (ttfx already does this for SIGWINCH) then `session.resize`. Don’t recreate the Metal device.
-
-Multi-display: independent sessions, independent random picks. Shared settings, shared ASCII.
-
-## Performance budget
-
-Target: 60 fps (120 on ProMotion) on a 5K iMac-class grid (~220×80 cells) with `< 20% of one P-core` and trivial GPU.
-
-| Cost | How we stay under |
-|---|---|
-| Effect physics | Already hundreds-to-thousands fps on 200×50 in `ttfx` |
-| ANSI encode/decode | Skipped |
-| Tty sleep | Skipped |
-| Glyph raster | Once per font size, atlas |
-| Per-frame CPU | Walk occupied cells, write instances |
-| Preview | 30 Hz, smaller font → fewer cells |
-
-Measure with Instruments on the host preview before wiring the appex. If `tick` exceeds half a vsync, move it to a worker and display the previous grid (double-buffer frames, not sessions).
+Multi-display: independent sessions, independent random picks, shared App Group files.
 
 ## Testing
 
 | Layer | Gate |
 |---|---|
-| `vendor/ttfx` | Their parity suite still passes after our patches |
-| `omacy-ascii` | Fixture images → golden `.txt` |
-| `omacy-engine` | Headless: known seed + input → grid hash for a few effects (not ANSI-identical; cell-identical to a `fill_grid` dump from patched ttfx) |
-| Renderer | Host preview screenshot smoke (manual / later snapshot) |
-| Appex | `open -a ScreenSaverEngine`, Console subsystem `be.zenjoy.omacy` |
+| Canary | Acceptance table above, macOS 26 (15 when available) |
+| `vendor/ttfx` | Upstream parity suite green after patches |
+| `fill_grid` | Asymmetric fixture: top-right glyph, bottom-left colored blank; origin + occupancy |
+| Engine | [parity.md](parity.md) matrix, all 37 effects |
+| ASCII | Goldens vs pinned Omarchy script |
+| FFI | Null, panic, limit, use-after-step pointer (Swift tests must not retain) |
+| Host | Preview still runs if the appex is uninstalled |
 
-CI on this repo can run the Rust tests without a Mac. The Xcode/appex path is local until we have a macOS runner.
+Rust tests run on CI without a Mac. Canary and saver idle tests are local until a macOS runner exists.
 
 ## Licensing
 
-- Omacy: MIT (Peter Dedene), this repo.
-- `ttfx` / TerminalTextEffects: MIT, ChrisBuilds + omacom-io. Preserve both in `NOTICE` and in the about screen.
-- Bundled font: SIL OFL, keep the license file next to the font.
+Omacy: MIT (Peter Dedene). `ttfx` / TTE / Omarchy branding and transcode rules: MIT; keep `NOTICE`. Bundled font: SIL OFL beside the font.
 
-Do not rebrand the effects as original work. Credit on the about screen: “Effects by Terminal Text Effects (ChrisBuilds), Rust engine `ttfx`.”
+About screen: “Effects by Terminal Text Effects (ChrisBuilds), Rust engine `ttfx`.”
 
 ## Delivery phases
 
-Build in this order so each phase is demoable without the next.
-
-0. **This spec.**
-1. **Windowed prototype.** Host app, Metal grid, vendored ttfx with `fill_grid`, default wordmark, random effects. No appex. This is the visual proof.
-2. **Config.** App Group, image import, threshold/invert/mode, effect picker, restore default.
-3. **Appex.** Extension target, PlugInKit, PaperSaver enable, preview vs fullscreen, thumbnail.
-4. **Polish.** Atlas coverage, ProMotion, Instruments pass, notarization, exclude-list, per-effect options if we still want them.
-
-Phase 1 is the real risk-reducer: if the grid looks like Omarchy in a window, the rest is Apple hosting.
+0. **This spec** (revision 2).
+1. **Appex canary.** Signed host+appex, fixed asymmetric grid, install/enable/idle/uninstall. **Go/no-go.**
+2. **Engine in the host.** Vendored `ttfx`, 60 Hz `step`, Metal renderer, default wordmark, random effects, parity matrix.
+3. **Engine in the canary.** Same renderer as the host, still no image UI.
+4. **Host config.** Paste, PNG/SVG, threshold/invert/mode, restore default, App Group reload at boundaries.
+5. **Polish.** Instruments, ProMotion present-vs-sim check, notarization, Settings sheet if still wanted.
 
 ## Risks
 
 | Risk | Mitigation |
 |---|---|
-| Private screensaver API breaks | Preview app still runs; AppexSaverMinimal is the canary |
-| `ttfx` clap-tangled effects | `from_name` + default configs; don’t parse argv in the saver |
-| Braille looks wrong | Bundled font, not SF Mono |
-| Tahoe pixel-vs-point bounds | Explicit backing-scale handling |
-| Appex sandbox vs user files | Convert in host, store text in App Group |
-| ttfx upstream moves fast | Pin a commit; patches stay < few hundred lines |
-| CPU on 5K | Atlas + skip empty cells; worker tick only if measured |
+| Private appex API | Phase 1 gate; AppexSaverMinimal is the template |
+| Tick-on-vsync speed bug | 60 Hz accumulator inside Rust |
+| Colored blanks dropped | Occupancy flags; fixture test |
+| Vertical flip | ABI origin + asymmetric golden |
+| FFI races / panics | Serialized session, `catch_unwind`, no retained pointers |
+| Resource bombs | Caps in the table above |
+| 60 Hz vs Omarchy 120 | Recorded in parity.md; consistent across Macs |
+| Braille looks wrong | Bundled OFL font, not SF Mono |
+| Tahoe bounds units | Backing-scale handling |
 
 ## Out of scope until someone asks
 
-Per-effect knobs (Omarchy uses defaults). Multiple saved logos. Color themes beyond the engine’s own palettes. Intel/universal binary (Apple Silicon first). A `.saver` fallback.
+Per-effect knobs. Exclude lists. Multiple saved logos. Color themes beyond the engine. Intel/universal. `.saver` fallback. `CAMetalDisplayLink`. Worker-thread publish buffers (if ever: immutable snapshots only; see [ffi.md](ffi.md)).
