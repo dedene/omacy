@@ -1,0 +1,15 @@
+Omacy
+Copyright (c) 2026 Peter Dedene
+
+This product includes software developed as Terminal Text Effects
+(https://github.com/ChrisBuilds/terminaltexteffects), Copyright (c) ChrisBuilds,
+MIT License.
+
+This product includes ttfx (https://github.com/omacom-io/ttfx), a Rust port of
+Terminal Text Effects, Copyright (c) omacom-io and contributors, MIT License.
+The original Terminal Text Effects copyright is preserved in that project’s
+LICENSE and NOTICE; those notices must be kept when vendoring ttfx.
+
+Omarchy’s default screensaver wordmark and the image-to-Braille conversion
+rules come from https://github.com/basecamp/omarchy, Copyright (c) 37signals /
+Omarchy contributors, MIT License.
