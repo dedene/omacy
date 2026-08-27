@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    name: Tests + parity suite
+    # Parity CI is pinned to one platform/toolchain pair (plan.md §5.20):
+    # cross-platform builds are release targets, not parity targets.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: ./bin/test
+
+  test-macos:
+    name: Tests (macOS)
+    # bin/test skips the parity suites off Linux, so what's left here proves the
+    # port builds, tests green (with the boundary-tolerant easing assertion for
+    # Apple's libm), and honors the CLI and signal contracts on macOS.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: ./bin/test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ttfx-aarch64-apple-darwin
+          path: target/release/ttfx
+
+  release-binary:
+    name: Static musl binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: cargo build --release --target x86_64-unknown-linux-musl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ttfx-x86_64-unknown-linux-musl
+          path: target/x86_64-unknown-linux-musl/release/ttfx

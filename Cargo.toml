@@ -1,0 +1,16 @@
+[workspace]
+members = ["crates/omacy-engine"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/dedene/omacy-screensaver"
+
+[profile.dev]
+panic = "unwind"
+
+[profile.release]
+panic = "unwind"
+lto = true
+codegen-units = 1

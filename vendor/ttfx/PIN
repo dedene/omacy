@@ -1,0 +1,9 @@
+7203e354498462064b7c0a89375051f65cf2ce99
+
+Patches (engine seams only; no effect-file forks):
+
+- Terminal::fill_grid + present-grid snapshot at frame()/ANSI emit
+- TerminalConfig::gui()
+- EngineCtx.suppress_ansi
+- Effect::advance default method
+- EffectCommand::from_name

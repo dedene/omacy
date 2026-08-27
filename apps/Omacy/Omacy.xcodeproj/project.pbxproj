@@ -1,0 +1,834 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1A000001000000000000000A /* OmacyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000001000000000000000B /* OmacyApp.swift */; };
+		1A000002000000000000000A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000002000000000000000B /* ContentView.swift */; };
+		1A000003000000000000000A /* OmacyScreensaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000003000000000000000B /* OmacyScreensaver.swift */; };
+		1A000004000000000000000A /* OmacySaverViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000004000000000000000B /* OmacySaverViewController.swift */; };
+		1A000005000000000000000A /* OmacySaverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000005000000000000000B /* OmacySaverView.swift */; };
+		1A000006000000000000000A /* ScreenSaver.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A000006000000000000000B /* ScreenSaver.framework */; };
+		1A000007000000000000000A /* OmacyScreensaver.appex in Embed PlugIns */ = {isa = PBXBuildFile; fileRef = 1A000007000000000000000B /* OmacyScreensaver.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		1A000030000000000000000A /* OmacyConfigurationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000030000000000000000B /* OmacyConfigurationViewController.swift */; };
+		1A000031000000000000000A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A000031000000000000000B /* Assets.xcassets */; };
+		1A000032000000000000000A /* PluginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000032000000000000000B /* PluginManager.swift */; };
+		1A000060000000000000000A /* OmacyCanaryAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000060000000000000000B /* OmacyCanaryAnimator.swift */; };
+		1A000061000000000000000A /* OmacyCanaryAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000060000000000000000B /* OmacyCanaryAnimator.swift */; };
+		1A000062000000000000000A /* PreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000062000000000000000B /* PreviewView.swift */; };
+		1A000063000000000000000A /* PreviewViewRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000063000000000000000B /* PreviewViewRepresentable.swift */; };
+		1A000066000000000000000A /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000064000000000000000B /* Logger.swift */; };
+		1A000067000000000000000A /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000064000000000000000B /* Logger.swift */; };
+		1A000070000000000000000A /* PaperSaverKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1A000070000000000000000B /* PaperSaverKit */; };
+		1A0000A0000000000000000A /* OmacyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000090000000000000000B /* OmacyRenderer.swift */; };
+		1A0000A1000000000000000A /* OmacyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000090000000000000000B /* OmacyRenderer.swift */; };
+		1A0000A2000000000000000A /* OmacyLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000091000000000000000B /* OmacyLayout.swift */; };
+		1A0000A3000000000000000A /* OmacyLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000091000000000000000B /* OmacyLayout.swift */; };
+		1A0000A4000000000000000A /* OmacyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000092000000000000000B /* OmacyStore.swift */; };
+		1A0000A5000000000000000A /* OmacyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000092000000000000000B /* OmacyStore.swift */; };
+		1A0000A6000000000000000A /* OmacyAtlas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000093000000000000000B /* OmacyAtlas.swift */; };
+		1A0000A7000000000000000A /* OmacyAtlas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000093000000000000000B /* OmacyAtlas.swift */; };
+		1A0000A8000000000000000A /* OmacyShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 1A000094000000000000000B /* OmacyShaders.metal */; };
+		1A0000A9000000000000000A /* OmacyShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 1A000094000000000000000B /* OmacyShaders.metal */; };
+		1A0000AA000000000000000A /* OmacyHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000095000000000000000B /* OmacyHostView.swift */; };
+		1A0000AB000000000000000A /* ConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000096000000000000000B /* ConfigView.swift */; };
+		1A0000AC000000000000000A /* FairfaxHD.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1A000097000000000000000B /* FairfaxHD.ttf */; };
+		1A0000AD000000000000000A /* FairfaxHD.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1A000097000000000000000B /* FairfaxHD.ttf */; };
+		1A0000AE000000000000000A /* screensaver.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1A000098000000000000000B /* screensaver.txt */; };
+		1A0000AF000000000000000A /* screensaver.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1A000098000000000000000B /* screensaver.txt */; };
+		1A0000B0000000000000000A /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1A000099000000000000000B /* OFL.txt */; };
+		1A0000B1000000000000000A /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1A000099000000000000000B /* OFL.txt */; };
+		1A0000B2000000000000000A /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A00009A000000000000000B /* Metal.framework */; };
+		1A0000B3000000000000000A /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A00009A000000000000000B /* Metal.framework */; };
+		1A0000B4000000000000000A /* libomacy_engine.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A00009B000000000000000B /* libomacy_engine.a */; };
+		1A0000B5000000000000000A /* libomacy_engine.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A00009B000000000000000B /* libomacy_engine.a */; };
+		1A0000B6000000000000000A /* OmacyCanaryAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00009D000000000000000B /* OmacyCanaryAnimator.swift */; };
+		1A0000B7000000000000000A /* OmacyCanaryAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00009D000000000000000B /* OmacyCanaryAnimator.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		1A000008000000000000000A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1A000000000000000000000A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1A000010000000000000000A;
+			remoteInfo = OmacyScreensaver;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		1A000009000000000000000A /* Embed PlugIns */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				1A000007000000000000000A /* OmacyScreensaver.appex in Embed PlugIns */,
+			);
+			name = "Embed PlugIns";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		1A000001000000000000000B /* OmacyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyApp.swift; sourceTree = "<group>"; };
+		1A000002000000000000000B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		1A000003000000000000000B /* OmacyScreensaver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyScreensaver.swift; sourceTree = "<group>"; };
+		1A000004000000000000000B /* OmacySaverViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacySaverViewController.swift; sourceTree = "<group>"; };
+		1A000005000000000000000B /* OmacySaverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacySaverView.swift; sourceTree = "<group>"; };
+		1A000006000000000000000B /* ScreenSaver.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ScreenSaver.framework; path = System/Library/Frameworks/ScreenSaver.framework; sourceTree = SDKROOT; };
+		1A000007000000000000000B /* OmacyScreensaver.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OmacyScreensaver.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A00000A000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		1A00000B000000000000000B /* Omacy.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Omacy.entitlements; sourceTree = "<group>"; };
+		1A00000C000000000000000B /* Omacy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Omacy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A00000D000000000000000B /* ScreenSaverPrivate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ScreenSaverPrivate.h; sourceTree = "<group>"; };
+		1A00000E000000000000000B /* OmacyScreensaver-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OmacyScreensaver-Bridging-Header.h"; sourceTree = "<group>"; };
+		1A00000F000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		1A000011000000000000000B /* OmacyScreensaver.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OmacyScreensaver.entitlements; sourceTree = "<group>"; };
+		1A000030000000000000000B /* OmacyConfigurationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyConfigurationViewController.swift; sourceTree = "<group>"; };
+		1A000031000000000000000B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1A000032000000000000000B /* PluginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginManager.swift; sourceTree = "<group>"; };
+		1A000050000000000000000B /* BuildNumber.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = BuildNumber.xcconfig; sourceTree = "<group>"; };
+		1A000060000000000000000B /* OmacyCanaryAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyCanaryAnimator.swift; sourceTree = "<group>"; };
+		1A000062000000000000000B /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
+		1A000063000000000000000B /* PreviewViewRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewViewRepresentable.swift; sourceTree = "<group>"; };
+		1A000064000000000000000B /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
+		1A000090000000000000000B /* OmacyRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyRenderer.swift; sourceTree = "<group>"; };
+		1A000091000000000000000B /* OmacyLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyLayout.swift; sourceTree = "<group>"; };
+		1A000092000000000000000B /* OmacyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyStore.swift; sourceTree = "<group>"; };
+		1A000093000000000000000B /* OmacyAtlas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyAtlas.swift; sourceTree = "<group>"; };
+		1A000094000000000000000B /* OmacyShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = OmacyShaders.metal; sourceTree = "<group>"; };
+		1A000095000000000000000B /* OmacyHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyHostView.swift; sourceTree = "<group>"; };
+		1A000096000000000000000B /* ConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigView.swift; sourceTree = "<group>"; };
+		1A000097000000000000000B /* FairfaxHD.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = FairfaxHD.ttf; path = ../../assets/fonts/FairfaxHD.ttf; sourceTree = SOURCE_ROOT; };
+		1A000098000000000000000B /* screensaver.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = screensaver.txt; path = ../../assets/branding/screensaver.txt; sourceTree = SOURCE_ROOT; };
+		1A000099000000000000000B /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = OFL.txt; path = ../../assets/fonts/OFL.txt; sourceTree = SOURCE_ROOT; };
+		1A00009A000000000000000B /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		1A00009B000000000000000B /* libomacy_engine.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libomacy_engine.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A00009C000000000000000B /* Omacy-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Omacy-Bridging-Header.h"; sourceTree = "<group>"; };
+		1A00009D000000000000000B /* OmacyCanaryAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyCanaryAnimator.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1A000012000000000000000A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A000070000000000000000A /* PaperSaverKit in Frameworks */,
+				1A0000B2000000000000000A /* Metal.framework in Frameworks */,
+				1A0000B4000000000000000A /* libomacy_engine.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1A000013000000000000000A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A000006000000000000000A /* ScreenSaver.framework in Frameworks */,
+				1A0000B3000000000000000A /* Metal.framework in Frameworks */,
+				1A0000B5000000000000000A /* libomacy_engine.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1A000014000000000000000C = {
+			isa = PBXGroup;
+			children = (
+				1A000050000000000000000B /* BuildNumber.xcconfig */,
+				1A000015000000000000000C /* Omacy */,
+				1A000016000000000000000C /* OmacyScreensaver */,
+				1A0000C0000000000000000C /* Shared */,
+				1A000017000000000000000C /* Frameworks */,
+				1A000018000000000000000C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		1A000015000000000000000C /* Omacy */ = {
+			isa = PBXGroup;
+			children = (
+				1A000065000000000000000C /* Helpers */,
+				1A000001000000000000000B /* OmacyApp.swift */,
+				1A000002000000000000000B /* ContentView.swift */,
+				1A000032000000000000000B /* PluginManager.swift */,
+				1A000095000000000000000B /* OmacyHostView.swift */,
+				1A000096000000000000000B /* ConfigView.swift */,
+				1A000063000000000000000B /* PreviewViewRepresentable.swift */,
+				1A00009C000000000000000B /* Omacy-Bridging-Header.h */,
+				1A00000A000000000000000B /* Info.plist */,
+				1A00000B000000000000000B /* Omacy.entitlements */,
+			);
+			path = Omacy;
+			sourceTree = "<group>";
+		};
+		1A000065000000000000000C /* Helpers */ = {
+			isa = PBXGroup;
+			children = (
+				1A000064000000000000000B /* Logger.swift */,
+			);
+			path = Helpers;
+			sourceTree = "<group>";
+		};
+		1A000016000000000000000C /* OmacyScreensaver */ = {
+			isa = PBXGroup;
+			children = (
+				1A000019000000000000000C /* PrivateHeaders */,
+				1A000003000000000000000B /* OmacyScreensaver.swift */,
+				1A000004000000000000000B /* OmacySaverViewController.swift */,
+				1A000005000000000000000B /* OmacySaverView.swift */,
+				1A000030000000000000000B /* OmacyConfigurationViewController.swift */,
+				1A000031000000000000000B /* Assets.xcassets */,
+				1A00000E000000000000000B /* OmacyScreensaver-Bridging-Header.h */,
+				1A00000F000000000000000B /* Info.plist */,
+				1A000011000000000000000B /* OmacyScreensaver.entitlements */,
+			);
+			path = OmacyScreensaver;
+			sourceTree = "<group>";
+		};
+		1A0000C0000000000000000C /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				1A00009D000000000000000B /* OmacyCanaryAnimator.swift */,
+				1A000090000000000000000B /* OmacyRenderer.swift */,
+				1A000091000000000000000B /* OmacyLayout.swift */,
+				1A000092000000000000000B /* OmacyStore.swift */,
+				1A000093000000000000000B /* OmacyAtlas.swift */,
+				1A000094000000000000000B /* OmacyShaders.metal */,
+				1A000097000000000000000B /* FairfaxHD.ttf */,
+				1A000098000000000000000B /* screensaver.txt */,
+				1A000099000000000000000B /* OFL.txt */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		1A000017000000000000000C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1A000006000000000000000B /* ScreenSaver.framework */,
+				1A00009A000000000000000B /* Metal.framework */,
+				1A00009B000000000000000B /* libomacy_engine.a */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		1A000018000000000000000C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1A00000C000000000000000B /* Omacy.app */,
+				1A000007000000000000000B /* OmacyScreensaver.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		1A000019000000000000000C /* PrivateHeaders */ = {
+			isa = PBXGroup;
+			children = (
+				1A00000D000000000000000B /* ScreenSaverPrivate.h */,
+			);
+			path = PrivateHeaders;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1A000010000000000000000A /* OmacyScreensaver */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1A00001F000000000000000A /* Build configuration list for PBXNativeTarget "OmacyScreensaver" */;
+			buildPhases = (
+				1A0000D1000000000000000A /* Build Rust engine */,
+				1A000020000000000000000A /* Sources */,
+				1A000013000000000000000A /* Frameworks */,
+				1A000021000000000000000A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OmacyScreensaver;
+			productName = OmacyScreensaver;
+			productReference = 1A000007000000000000000B /* OmacyScreensaver.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		1A00001A000000000000000A /* Omacy */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1A00001B000000000000000A /* Build configuration list for PBXNativeTarget "Omacy" */;
+			buildPhases = (
+				1A0000D0000000000000000A /* Build Rust engine */,
+				1A00001C000000000000000A /* Sources */,
+				1A000012000000000000000A /* Frameworks */,
+				1A00001D000000000000000A /* Resources */,
+				1A000009000000000000000A /* Embed PlugIns */,
+				1A000042000000000000000A /* Register Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1A00001E000000000000000A /* PBXTargetDependency */,
+			);
+			name = Omacy;
+			packageProductDependencies = (
+				1A000070000000000000000B /* PaperSaverKit */,
+			);
+			productName = Omacy;
+			productReference = 1A00000C000000000000000B /* Omacy.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1A000000000000000000000A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					1A000010000000000000000A = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					1A00001A000000000000000A = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = 1A000022000000000000000A /* Build configuration list for PBXProject "Omacy" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 1A000014000000000000000C;
+			packageReferences = (
+				1A000071000000000000000A /* XCRemoteSwiftPackageReference "PaperSaver" */,
+			);
+			productRefGroup = 1A000018000000000000000C /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1A00001A000000000000000A /* Omacy */,
+				1A000010000000000000000A /* OmacyScreensaver */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1A00001D000000000000000A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A0000AC000000000000000A /* FairfaxHD.ttf in Resources */,
+				1A0000AE000000000000000A /* screensaver.txt in Resources */,
+				1A0000B0000000000000000A /* OFL.txt in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1A000021000000000000000A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A000031000000000000000A /* Assets.xcassets in Resources */,
+				1A0000AD000000000000000A /* FairfaxHD.ttf in Resources */,
+				1A0000AF000000000000000A /* screensaver.txt in Resources */,
+				1A0000B1000000000000000A /* OFL.txt in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1A0000D0000000000000000A /* Build Rust engine */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust engine";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/libomacy_engine.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "sh \"${SRCROOT}/scripts/build-engine.sh\"\n";
+		};
+		1A0000D1000000000000000A /* Build Rust engine */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust engine";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/libomacy_engine.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "sh \"${SRCROOT}/scripts/build-engine.sh\"\n";
+		};
+		1A000042000000000000000A /* Register Extensions */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Register Extensions";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "find \"$CODESIGNING_FOLDER_PATH\" -name '*.appex' -exec pluginkit -a {} \\;\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1A00001C000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A000001000000000000000A /* OmacyApp.swift in Sources */,
+				1A000002000000000000000A /* ContentView.swift in Sources */,
+				1A000032000000000000000A /* PluginManager.swift in Sources */,
+				1A000066000000000000000A /* Logger.swift in Sources */,
+				1A0000A0000000000000000A /* OmacyRenderer.swift in Sources */,
+				1A0000A2000000000000000A /* OmacyLayout.swift in Sources */,
+				1A0000A4000000000000000A /* OmacyStore.swift in Sources */,
+				1A0000A6000000000000000A /* OmacyAtlas.swift in Sources */,
+				1A0000A8000000000000000A /* OmacyShaders.metal in Sources */,
+				1A0000AA000000000000000A /* OmacyHostView.swift in Sources */,
+				1A0000AB000000000000000A /* ConfigView.swift in Sources */,
+				1A000063000000000000000A /* PreviewViewRepresentable.swift in Sources */,
+				1A0000B6000000000000000A /* OmacyCanaryAnimator.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1A000020000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A000003000000000000000A /* OmacyScreensaver.swift in Sources */,
+				1A000004000000000000000A /* OmacySaverViewController.swift in Sources */,
+				1A000005000000000000000A /* OmacySaverView.swift in Sources */,
+				1A000030000000000000000A /* OmacyConfigurationViewController.swift in Sources */,
+				1A000067000000000000000A /* Logger.swift in Sources */,
+				1A0000B7000000000000000A /* OmacyCanaryAnimator.swift in Sources */,
+				1A0000A1000000000000000A /* OmacyRenderer.swift in Sources */,
+				1A0000A3000000000000000A /* OmacyLayout.swift in Sources */,
+				1A0000A5000000000000000A /* OmacyStore.swift in Sources */,
+				1A0000A7000000000000000A /* OmacyAtlas.swift in Sources */,
+				1A0000A9000000000000000A /* OmacyShaders.metal in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		1A00001E000000000000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1A000010000000000000000A /* OmacyScreensaver */;
+			targetProxy = 1A000008000000000000000A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1A000023000000000000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1A000050000000000000000B /* BuildNumber.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		1A000024000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1A000050000000000000000B /* BuildNumber.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		1A000025000000000000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Omacy/Omacy.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Omacy/Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = be.zenjoy.omacy;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../crates/omacy-engine/include",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lomacy_engine",
+					"-lc++",
+					"-framework",
+					Security,
+					"-framework",
+					CoreFoundation,
+					"-framework",
+					SystemConfiguration,
+				);
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Omacy/Omacy-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		1A000026000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Omacy/Omacy.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Omacy/Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = be.zenjoy.omacy;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../crates/omacy-engine/include",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lomacy_engine",
+					"-lc++",
+					"-framework",
+					Security,
+					"-framework",
+					CoreFoundation,
+					"-framework",
+					SystemConfiguration,
+				);
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Omacy/Omacy-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		1A000027000000000000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = OmacyScreensaver/OmacyScreensaver.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OmacyScreensaver/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Omacy;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = be.zenjoy.omacy.screensaver;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../crates/omacy-engine/include",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lomacy_engine",
+					"-lc++",
+					"-framework",
+					Security,
+					"-framework",
+					CoreFoundation,
+					"-framework",
+					SystemConfiguration,
+				);
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "OmacyScreensaver/OmacyScreensaver-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		1A000028000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = OmacyScreensaver/OmacyScreensaver.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OmacyScreensaver/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Omacy;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = be.zenjoy.omacy.screensaver;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../crates/omacy-engine/include",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lomacy_engine",
+					"-lc++",
+					"-framework",
+					Security,
+					"-framework",
+					CoreFoundation,
+					"-framework",
+					SystemConfiguration,
+				);
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "OmacyScreensaver/OmacyScreensaver-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1A00001B000000000000000A /* Build configuration list for PBXNativeTarget "Omacy" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A000025000000000000000A /* Debug */,
+				1A000026000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1A00001F000000000000000A /* Build configuration list for PBXNativeTarget "OmacyScreensaver" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A000027000000000000000A /* Debug */,
+				1A000028000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1A000022000000000000000A /* Build configuration list for PBXProject "Omacy" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A000023000000000000000A /* Debug */,
+				1A000024000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1A000071000000000000000A /* XCRemoteSwiftPackageReference "PaperSaver" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/AerialScreensaver/PaperSaver.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1A000070000000000000000B /* PaperSaverKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A000071000000000000000A /* XCRemoteSwiftPackageReference "PaperSaver" */;
+			productName = PaperSaverKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 1A000000000000000000000A /* Project object */;
+}
