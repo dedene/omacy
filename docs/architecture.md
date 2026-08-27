@@ -4,7 +4,7 @@ macOS screensaver that replays Omarchy’s ASCII text-effects loop: a logo (or a
 
 Stack: **patched `ttfx` → C ABI cell grid → Metal renderer → host app + `.appex`.**
 
-Revision 3 of this design. Implementation starts only after this revision is accepted.
+Revision 4 of this design. Implementation starts only after this revision is accepted.
 
 Companion contracts: [ffi.md](ffi.md) (ABI, threading, occupancy, origin) and [parity.md](parity.md) (pins, clock, 37-effect matrix).
 
@@ -25,7 +25,7 @@ Fidelity is **measured**, not vibed. Motion is cell-grid identity against an **i
 - Python TTE, ImageMagick at runtime, effect exclude-lists, per-effect knobs.
 - Filesystem watchers. Settings reload at session start and at effect boundaries only.
 - A separate `omacy-ascii` crate. Conversion stays an internal engine module until a second consumer exists.
-- A worker-thread renderer. The session never leaves its creating thread.
+- A worker-thread renderer. Production sessions live on the main thread only.
 - Self-install, in-app updater, or self-delete from `/Applications`.
 
 ## Locked decisions
@@ -40,10 +40,12 @@ Fidelity is **measured**, not vibed. Motion is cell-grid identity against an **i
 | Reverse | Resolved inside `fill_grid` | Glyph-only reverse must emit a background quad |
 | Origin | Top-left, rows increase downward | Terminal-internal order is not the ABI |
 | Simulation | Fixed 60 Hz steps, vsync presents | Speed must not track the display |
-| Threading | Create-thread affinity; `WRONG_THREAD` | ttfx is `Rc` / thread-local; a mutex is not `Send` |
+| Threading | Main thread / `@MainActor` only | A display link is not a dispatch queue |
+| Geometry | `create(..., cols, rows)` + `resize` only | Pending/disk config must not restore stale size |
+| Font size | Swift / renderer only | Engine must not start the next effect on an old canvas |
 | Draw path | Metal glyph atlas + instanced quads | Core Text per cell per frame would dominate CPU |
-| Display link | `NSView.displayLink(target:selector:)` | AppKit API; not a UIKit window-scene link |
-| Settings | App Group; pending config or disk at boundary | Host and appex are different processes; no kqueue |
+| Display link | `NSView.displayLink` on the **main** run loop | Callback is main-thread; destroy before invalidate |
+| Settings | App Group; pending **content** or disk at boundary | No `cols`/`rows` in replaceable config |
 | Install | DMG → drag to `/Applications` | Sandboxed app cannot copy/update/delete itself |
 | Image convert | Internal engine module, host-only UI | One consumer; `NSOpenPanel` is in the app |
 | Effect pool | All 37, no excludes | Matches current Omarchy `omarchy-screensaver` |
@@ -60,11 +62,14 @@ Omacy.app  (SwiftUI chrome: preview, install/enable, config)
   PlugIns/Omacy.appex
     ScreenSaverView ──► OmacyRenderer ──► ScreenSaverEngine / WallpaperAgent
 
-OmacyRenderer
-  layout → session.step(elapsed) → Metal upload
+OmacyRenderer  (@MainActor)
+  displayLink (main run loop)
+    → step(elapsed)
+    → if needs_begin_next: apply font, resize, begin_next
+    → Metal upload
        │
        ▼
-libomacy_engine.a   (thread-affine session, 60 Hz accumulator)
+libomacy_engine.a   (main-thread session, 60 Hz accumulator)
        ├─ vendored ttfx
        └─ ascii module (PNG/SVG → text; host config only)
 ```
@@ -129,7 +134,7 @@ Small, upstreamable, parity suites stay green.
 
 Do not fork effect files. Do not change RNG, easing, or painter order.
 
-On effect completion the session starts the next effect (random from all 37, or the pinned name) **before** `step` returns. Swift always receives a grid on success. Completion is not an FFI return code.
+On effect completion `step` publishes the last frame, applies pending/disk **content** (art, effect name, background), sets `needs_begin_next`, and stops. It does **not** construct the next effect. Swift then applies font size, `resize`s if the cell grid changed, and calls `begin_next`. That is the only way a new effect starts. Completion is not an error status.
 
 ## Renderer
 
@@ -140,7 +145,7 @@ Layout, from view bounds in **points** and the backing scale factor:
 - `cols = floor(viewWidth / cellWidth)`, `rows = floor(viewHeight / cellHeight)`, both ≥ 1, both capped (see Limits).
 - `cols * rows` uses checked multiplication; overflow is a failed resize, last grid kept.
 - Remainder is black margin; the grid is centered.
-- If `cols,rows` change after a 50 ms debounce, `resize` (invalidates the frame pointer).
+- If `cols,rows` change after a 50 ms debounce, `resize` (invalidates the frame pointer). Font-size changes are the same path: Swift owns `fontSize`, recomputes cells, `resize`s, **then** `begin_next` if a boundary is pending.
 
 Preview uses the **same 18 pt**. Smaller bounds ⇒ fewer cells. Do not shrink the preview font: that would increase cell count.
 
@@ -153,7 +158,7 @@ Metal:
 3. Clear color = session background (`#000000`).
 4. Triple-buffered instance storage. Upload **during** `step`’s return, before any other session call.
 
-Display link: `NSView.displayLink(target:selector:)` scheduled on the current run loop. Appex `SSENeedsAnimationTimer = false`. Start when the view has a window (`viewDidMoveToWindow`, `startAnimation`); invalidate on nil window, `stopAnimation`, `deinit`, and `com.apple.screensaver.willstop`. Preferred frame rate: fullscreen max (60–120), Settings preview 30 Hz.
+Display link: `NSView.displayLink(target:selector:)` added to the **main** run loop (`.common`). Appex `SSENeedsAnimationTimer = false`. Create the session on the main thread when the view has a window (`viewDidMoveToWindow`, `startAnimation`). Stop on the main thread in this order: `omacy_session_destroy`, then invalidate the link, then drop Metal. Triggers: `stopAnimation`, nil window, `com.apple.screensaver.willstop`. `deinit` asserts if the session is still alive and only then attempts destroy — it is not the primary path. Preferred frame rate: fullscreen max (60–120), Settings preview 30 Hz.
 
 `CAMetalDisplayLink` is a measured alternative, not the default.
 
@@ -191,7 +196,7 @@ MVP distribution is a **signed, notarized DMG**. The user drags `Omacy.app` into
 - **Update:** user replaces the app via a new DMG drop. Host re-registers on next launch. No Sparkle / no self-update in MVP.
 - **Uninstall:** host unregisters (`pluginkit -r`) and shows instructions to Trash the app and optionally delete the App Group. No self-delete.
 - **Signing:** ad-hoc for local canary; Developer ID + notarize on the DMG before any other machine.
-- **Failure:** last-known-good `settings.json` + `screensaver.txt` (write temp, `rename`). Invalid files fall back to bundled defaults and surface an error in the host. A dead session is `destroy`ed on the display-link thread and recreated there with last-known-good.
+- **Failure:** last-known-good `settings.json` + `screensaver.txt` (write temp, `rename`). Invalid files fall back to bundled defaults and surface an error in the host. A dead session is `destroy`ed on the main thread and recreated there with last-known-good content and the current `resize`.
 
 ## Settings
 
@@ -205,19 +210,27 @@ settings.json
 ```json
 {
   "effect": "random",
+  "background": "#000000",
   "fontSize": 18,
   "asciiMode": "braille",
   "threshold": 50,
-  "invert": false,
-  "background": "#000000"
+  "invert": false
 }
 ```
 
-No `exclude` key in MVP. `effect` is `"random"` or a `ttfx` name.
+No `exclude`, no `cols`/`rows`. `effect` is `"random"` or a `ttfx` name.
 
-The session is created on the display-link thread with a deep-copied `OmacyConfig`. At effect boundaries it applies `set_next_config` if pending, otherwise rereads the App Group directory (see [ffi.md](ffi.md)). Failed reads keep last-known-good. No dispatch source, no `NSFileCoordinator` watcher.
+**Ownership**
 
-Image import, threshold, invert, mode, and paste-from-text run in the host app. Saving writes the App Group and, if a preview session exists, dispatches `set_next_config` onto that session’s thread. The System Settings sheet, when added, can change `effect` and restore default art only.
+| Key | Owner | When it hits the engine |
+|---|---|---|
+| `effect`, `background`, `screensaver.txt` | Engine (disk or `OmacyPendingConfig`) | Create, and at a boundary *before* `begin_next` |
+| `fontSize` | Swift / `OmacyRenderer` only | Never sent to the engine. Drives cell metrics → `resize` |
+| `asciiMode`, `threshold`, `invert` | Host config UI only | Conversion time, not the live session |
+
+The session is created on the main thread with `OmacySessionConfig` plus initial `cols`/`rows`. At an effect end, `step` applies pending content or rereads engine keys from disk (see [ffi.md](ffi.md)), then waits. Swift reads `fontSize` (from its own copy of settings), recomputes the grid, `resize`s if needed, then `begin_next`. Failed disk reads keep last-known-good **content**; geometry is untouched. No dispatch source, no `NSFileCoordinator` watcher.
+
+Image import, threshold, invert, mode, and paste-from-text run in the host app. Saving writes the App Group and, if a preview session exists, `set_pending_config` on the main thread. The System Settings sheet, when added, can change `effect` and restore default art only.
 
 ## Image → ASCII
 
@@ -247,8 +260,8 @@ Preload is ASCII `0x20–0x7E` + Braille block + conversion block characters. Pa
 
 ## Lifecycle
 
-- `stopAnimation` may not run on Tahoe. Also stop in `deinit`, nil window, and `com.apple.screensaver.willstop`.
-- Settings preview can leak views. `OmacyRenderer.stop` drops Metal and `omacy_session_destroy`.
+- `stopAnimation` may not run on Tahoe. Also stop from `willstop` and nil window — still on the main thread, destroy-then-invalidate.
+- Settings preview can leak views. `OmacyRenderer.stop` is the primary cleanup. `deinit` asserts if a session remains.
 - After a rebuild, re-register; `killall ScreenSaverEngine` is a documented dev hammer.
 
 Multi-display: independent sessions, independent random picks, shared App Group files.
@@ -262,7 +275,7 @@ Multi-display: independent sessions, independent random picks, shared App Group 
 | `fill_grid` | Vs ANSI oracle; asymmetric origin fixture; reverse × four occupancies |
 | Engine | [parity.md](parity.md) matrix, all 37 effects |
 | ASCII | Identity vs committed fixtures |
-| FFI | Null, panic, limit, wrong-thread, use-after-step pointer (Swift must not retain) |
+| FFI | Null, panic, limit, wrong-thread, `needs_begin_next` then `resize`+`begin_next`, use-after-step pointer |
 | Host | Preview still runs if the appex is uninstalled |
 
 Rust tests run on CI without a Mac. Canary and saver idle tests are local until a macOS runner exists.
@@ -275,7 +288,7 @@ About screen: “Effects by Terminal Text Effects (ChrisBuilds), Rust engine `tt
 
 ## Delivery phases
 
-0. **This spec** (revision 3).
+0. **This spec** (revision 4).
 1. **Appex canary.** Signed host+appex, fixed asymmetric grid, install/enable/idle/uninstall. **Go/no-go.**
 2. **Engine in the host.** Vendored `ttfx`, 60 Hz `step`, Metal renderer, default wordmark, random effects, parity matrix.
 3. **Engine in the canary.** Same renderer as the host, still no image UI.
@@ -290,7 +303,9 @@ About screen: “Effects by Terminal Text Effects (ChrisBuilds), Rust engine `tt
 | Tick-on-vsync speed bug | 60 Hz accumulator inside Rust |
 | Colored blanks / reverse | Occupancy flags; reverse resolved in `fill_grid`; four-combo fixtures |
 | Vertical flip | ABI origin + asymmetric golden |
-| FFI races / panics | Thread affinity, `catch_unwind`, `panic = "unwind"`, no retained pointers |
+| FFI races / panics | Main-thread ownership, `catch_unwind`, `panic = "unwind"`, no retained pointers |
+| Stale geometry on config | `resize` only; pending config has no dimensions |
+| Font vs next effect | `needs_begin_next`; Swift resizes, then `begin_next` |
 | Resource bombs | Caps in the table above |
 | 60 Hz vs Omarchy 120 | Recorded in parity.md; consistent across Macs |
 | Braille looks wrong | Bundled OFL font, not SF Mono |
@@ -298,4 +313,4 @@ About screen: “Effects by Terminal Text Effects (ChrisBuilds), Rust engine `tt
 
 ## Out of scope until someone asks
 
-Per-effect knobs. Exclude lists. Multiple saved logos. Color themes beyond the engine. Intel/universal. `.saver` fallback. `CAMetalDisplayLink`. Self-update. Worker-thread sessions (if ever: a second session created on that thread, or immutable snapshots — never `Send` the original).
+Per-effect knobs. Exclude lists. Multiple saved logos. Color themes beyond the engine. Intel/universal. `.saver` fallback. `CAMetalDisplayLink`. Self-update. Off-main sessions (if ever: immutable snapshots produced on main — never `Send` the session).
