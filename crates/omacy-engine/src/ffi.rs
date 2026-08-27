@@ -251,6 +251,12 @@ fn with_live_session(
     }
 }
 
+/// Induces a panic inside the same `catch_unwind` wrapper as session FFI.
+/// Not part of the C ABI; engine tests use it to prove `cells` is invalidated.
+pub unsafe fn debug_induce_panic(s: *mut Session) -> OmacyStatus {
+    with_live_session(s, |_| panic!("omacy induced panic"))
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn omacy_session_resize(s: *mut Session, cols: u32, rows: u32) -> OmacyStatus {
     with_live_session(s, |session| session.resize(cols, rows))

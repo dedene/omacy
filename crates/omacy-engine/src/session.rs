@@ -312,6 +312,11 @@ impl Session {
     }
 
     pub fn published_c_frame(&self) -> OmacyFrame {
+        let cells = if self.cache.is_empty() || matches!(self.state, LiveState::Dead) {
+            std::ptr::null()
+        } else {
+            self.cache.as_ptr()
+        };
         OmacyFrame {
             cols: self.cols,
             rows: self.rows,
@@ -320,7 +325,7 @@ impl Session {
             clear_b: self.clear[2],
             clear_a: self.clear[3],
             _pad: 0,
-            cells: self.cache.as_ptr(),
+            cells,
         }
     }
 }

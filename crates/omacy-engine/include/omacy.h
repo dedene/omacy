@@ -19,6 +19,9 @@ typedef enum {
   OMACY_ERR_WRONG_THREAD = 7
 } omacy_status;
 
+#define OMACY_CELL_HAS_BACKGROUND 1
+#define OMACY_CELL_HAS_GLYPH 2
+
 typedef struct {
   uint32_t glyph;
   uint8_t fg_r, fg_g, fg_b, fg_a;

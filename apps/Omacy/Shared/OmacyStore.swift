@@ -22,9 +22,17 @@ struct OmacySettings: Equatable {
     }
 }
 
+extension Notification.Name {
+    static let omacyConfigDidChange = Notification.Name("omacy.configDidChange")
+}
+
 enum OmacyStore {
     static let appGroup = "group.be.zenjoy.omacy"
     static let forceCanaryKey = "omacy.forceCanary"
+
+    private static var lastGoodSettings = OmacySettings()
+    private static var lastGoodArt: String?
+    static private(set) var lastLoadError: String?
 
     static var containerURL: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
@@ -48,24 +56,38 @@ enum OmacyStore {
     }
 
     static func loadSettings() -> OmacySettings {
-        guard let url = settingsURL, let data = try? Data(contentsOf: url),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return OmacySettings()
+        guard let url = settingsURL else { return lastGoodSettings }
+        guard FileManager.default.fileExists(atPath: url.path) else { return lastGoodSettings }
+        do {
+            let data = try Data(contentsOf: url)
+            guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                lastLoadError = "settings.json is invalid; keeping last-known-good"
+                return lastGoodSettings
+            }
+            var s = OmacySettings()
+            if let effect = obj["effect"] as? String { s.effect = effect }
+            if let background = obj["background"] as? String { s.background = background }
+            if let fontSize = obj["fontSize"] as? Double { s.fontSize = fontSize }
+            if let asciiMode = obj["asciiMode"] as? String { s.asciiMode = asciiMode }
+            if let threshold = obj["threshold"] as? Int { s.threshold = threshold }
+            if let invert = obj["invert"] as? Bool { s.invert = invert }
+            lastGoodSettings = s
+            lastLoadError = nil
+            return s
+        } catch {
+            lastLoadError = "Could not read settings.json; keeping last-known-good"
+            return lastGoodSettings
         }
-        var s = OmacySettings()
-        if let effect = obj["effect"] as? String { s.effect = effect }
-        if let background = obj["background"] as? String { s.background = background }
-        if let fontSize = obj["fontSize"] as? Double { s.fontSize = fontSize }
-        if let asciiMode = obj["asciiMode"] as? String { s.asciiMode = asciiMode }
-        if let threshold = obj["threshold"] as? Int { s.threshold = threshold }
-        if let invert = obj["invert"] as? Bool { s.invert = invert }
-        return s
     }
 
     static func loadArt() -> String {
-        if let url = artURL, let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty {
-            return text
+        if let url = artURL {
+            if let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty {
+                lastGoodArt = text
+                return text
+            }
         }
+        if let lastGoodArt { return lastGoodArt }
         return bundledArt
     }
 
@@ -85,6 +107,10 @@ enum OmacyStore {
         let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
         try atomicWrite(data, to: settingsURL!)
         try atomicWrite(Data(art.utf8), to: artURL!)
+        lastGoodSettings = settings
+        lastGoodArt = art
+        lastLoadError = nil
+        NotificationCenter.default.post(name: .omacyConfigDidChange, object: nil)
     }
 
     static func restoreDefaultArt() throws {
@@ -97,7 +123,14 @@ enum OmacyStore {
 
     private static func atomicWrite(_ data: Data, to url: URL) throws {
         let tmp = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).tmp")
-        try data.write(to: tmp, options: .atomic)
-        _ = try FileManager.default.replaceItemAt(url, withItemAt: tmp)
+        if FileManager.default.fileExists(atPath: tmp.path) {
+            try FileManager.default.removeItem(at: tmp)
+        }
+        try data.write(to: tmp)
+        if FileManager.default.fileExists(atPath: url.path) {
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: tmp)
+        } else {
+            try FileManager.default.moveItem(at: tmp, to: url)
+        }
     }
 }

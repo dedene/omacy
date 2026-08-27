@@ -1,11 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct PreviewViewRepresentable: NSViewRepresentable {
-    func makeNSView(context: Context) -> OmacyHostView { OmacyHostView() }
-    func updateNSView(_ nsView: OmacyHostView, context: Context) { }
-}
-
 struct ConfigView: View {
     @State private var settings = OmacyStore.loadSettings()
     @State private var art = OmacyStore.loadArt()
@@ -47,6 +42,14 @@ struct ConfigView: View {
             }
             Section("Type") {
                 Stepper("Font size \(Int(settings.fontSize)) pt", value: $settings.fontSize, in: 8...48)
+            }
+            Section("About") {
+                Text("Effects by Terminal Text Effects (ChrisBuilds), Rust engine ttfx.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let error = OmacyStore.lastLoadError {
+                Text(error).font(.caption).foregroundStyle(.red)
             }
             Text(status).font(.caption).foregroundStyle(.secondary)
             Button("Save") { persist() }

@@ -60,6 +60,7 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), EngineError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::content::Content;
     use std::env;
 
     #[test]
@@ -69,6 +70,22 @@ mod tests {
         let path = dir.join("settings.json");
         write_atomic(&path, b"{\"effect\":\"random\"}").unwrap();
         assert_eq!(fs::read(&path).unwrap(), b"{\"effect\":\"random\"}");
+        write_atomic(&path, b"{\"effect\":\"beams\"}").unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"{\"effect\":\"beams\"}");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn invalid_json_keeps_last_known_good() {
+        let dir = env::temp_dir().join(format!("omacy-badjson-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("settings.json"), b"{not json").unwrap();
+        fs::write(dir.join("screensaver.txt"), b"HELLO").unwrap();
+        let fallback = Content::from_parts("FALLBACK".into(), "beams".into(), [1, 2, 3, 255]).unwrap();
+        let next = load_from_dir(&dir, &fallback);
+        assert_eq!(next.effect, "beams");
+        assert_eq!(next.bg, [1, 2, 3, 255]);
+        assert_eq!(next.art, "HELLO");
         let _ = fs::remove_dir_all(&dir);
     }
 }

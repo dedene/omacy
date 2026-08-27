@@ -198,3 +198,14 @@ fn status_strings_are_nul_terminated() {
         assert_eq!(s, "OMACY_OK");
     }
 }
+
+#[test]
+fn mark_dead_clears_published_cells() {
+    let mut s = session("beams", 20, 8);
+    let (frame, _) = s.step(1.0 / 60.0).unwrap();
+    assert!(!frame.cells.is_null());
+    s.mark_dead("test".into());
+    assert!(s.is_dead());
+    let frame = s.published_c_frame();
+    assert!(frame.cells.is_null());
+}

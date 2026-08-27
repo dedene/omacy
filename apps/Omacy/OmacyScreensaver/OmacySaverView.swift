@@ -13,11 +13,17 @@ final class OmacySaverView: ScreenSaverView {
         super.init(frame: frame, isPreview: isPreview)
         wantsLayer = true
         animationTimeInterval = 1.0 / 60.0
+        renderer.onEngineUnavailable = { [weak self] in
+            self?.switchToCanary()
+        }
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         wantsLayer = true
+        renderer.onEngineUnavailable = { [weak self] in
+            self?.switchToCanary()
+        }
     }
 
     deinit {
@@ -57,18 +63,23 @@ final class OmacySaverView: ScreenSaverView {
     }
 
     private func start() {
-        renderer.attach(to: self, isPreview: isPreview)
-        if renderer.usesEngine && !OmacyStore.forceCanary {
+        teardown()
+        switch renderer.attach(to: self, isPreview: isPreview) {
+        case .engine:
             usingCanary = false
             renderer.start()
-        } else {
-            usingCanary = true
-            if let layer {
-                canary.attach(to: layer)
-                canary.updateBounds(bounds)
-            }
-            canary.start()
+        case .canary:
+            switchToCanary()
         }
+    }
+
+    private func switchToCanary() {
+        usingCanary = true
+        if let layer {
+            canary.attach(to: layer)
+            canary.updateBounds(bounds)
+        }
+        canary.start()
     }
 
     private func teardown() {

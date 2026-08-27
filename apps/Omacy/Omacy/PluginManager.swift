@@ -21,6 +21,13 @@ class PluginManager: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var lastError: String?
 
+    /// Registered with PlugInKit but the appex file is gone.
+    var isPluginMissing: Bool {
+        guard isInstalled else { return false }
+        guard let path = installedPath, !path.isEmpty else { return true }
+        return !FileManager.default.fileExists(atPath: path)
+    }
+
     @Published var isActiveScreensaver: Bool = false
     @Published var isCheckingScreensaver: Bool = false
     @Published var screensaverError: String?

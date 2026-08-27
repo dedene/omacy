@@ -17,3 +17,5 @@ jobs:
           toolchain: 1.88.0
       - name: Engine tests
         run: cargo test -p omacy-engine
+      - name: Vendored ttfx tests
+        run: cargo test --manifest-path vendor/ttfx/Cargo.toml

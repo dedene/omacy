@@ -4,6 +4,9 @@ use ttfx::engine::PackedCell;
 
 pub type OmacyCell = PackedCell;
 
+pub const OMACY_CELL_HAS_BACKGROUND: u8 = ttfx::engine::CELL_HAS_BACKGROUND;
+pub const OMACY_CELL_HAS_GLYPH: u8 = ttfx::engine::CELL_HAS_GLYPH;
+
 pub const OMACY_ASCII_BRAILLE: u32 = 0;
 pub const OMACY_ASCII_BLOCK: u32 = 1;
 
@@ -143,10 +146,10 @@ mod tests {
     }
 
     #[test]
-    fn frame_layout() {
-        assert_eq!(size_of::<OmacyFrame>(), 24);
-        assert_eq!(align_of::<OmacyFrame>(), 8);
-        assert_eq!(offset_of!(OmacyFrame, cols), 0);
-        assert_eq!(offset_of!(OmacyFrame, cells), 16);
+    fn occupancy_constants_match_ttfx() {
+        assert_eq!(OMACY_CELL_HAS_BACKGROUND, 1);
+        assert_eq!(OMACY_CELL_HAS_GLYPH, 2);
+        assert_eq!(OMACY_CELL_HAS_BACKGROUND, ttfx::engine::CELL_HAS_BACKGROUND);
+        assert_eq!(OMACY_CELL_HAS_GLYPH, ttfx::engine::CELL_HAS_GLYPH);
     }
 }

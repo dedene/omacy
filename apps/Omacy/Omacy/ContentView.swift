@@ -79,6 +79,11 @@ struct ContentView: View {
                 .padding(.top, 10)
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
+
+            Text("Effects by Terminal Text Effects (ChrisBuilds), Rust engine ttfx.")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
         }
         .padding(40)
         .fixedSize()
@@ -101,7 +106,7 @@ struct ContentView: View {
                                 .foregroundColor(.secondary)
                         }
                     } else {
-                        Text("Not Installed")
+                        Text("Not registered")
                             .fontWeight(.medium)
                             .foregroundColor(.secondary)
                     }
@@ -123,6 +128,11 @@ struct ContentView: View {
                 }
 
                 if pluginManager.isInstalled {
+                    if pluginManager.isPluginMissing {
+                        Text("The registered screensaver extension is missing. Re-register it from this app.")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
                     if let path = pluginManager.installedPath {
                         HStack(alignment: .top) {
                             Text("Path:")
@@ -135,6 +145,9 @@ struct ContentView: View {
                         .font(.caption)
                     }
                 } else {
+                    Text("Omacy is not in System Settings yet. Register the extension from this app — the preview still runs either way.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     if let embeddedVersion = pluginManager.embeddedVersion {
                         Text("Embedded version: \(embeddedVersion)")
                             .font(.caption)
@@ -150,14 +163,14 @@ struct ContentView: View {
 
                 HStack {
                     Spacer()
-                    if pluginManager.isInstalled {
+                    if pluginManager.isInstalled && !pluginManager.isPluginMissing {
                         Button("Uninstall") {
                             uninstallExtension()
                         }
                         .buttonStyle(.bordered)
                         .disabled(pluginManager.isLoading)
                     } else {
-                        Button("Install") {
+                        Button(pluginManager.isPluginMissing ? "Re-register" : "Install") {
                             installExtension()
                         }
                         .buttonStyle(.borderedProminent)
@@ -245,7 +258,7 @@ struct ContentView: View {
         statusMessage = "Uninstalling extension..."
         do {
             try pluginManager.uninstall()
-            statusMessage = "Extension uninstalled successfully"
+            statusMessage = "Unregistered. Move Omacy to Trash to finish removing it. You can also delete the App Group data if you want a clean slate."
         } catch {
             statusMessage = "Uninstall failed: \(error.localizedDescription)"
             logger.error("Uninstall failed: \(error.localizedDescription, privacy: .public)")

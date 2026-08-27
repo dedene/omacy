@@ -54,6 +54,10 @@ final class OmacyAtlas {
         upload(device: device)
     }
 
+    var whitePixel: AtlasGlyph {
+        map[0] ?? AtlasGlyph(uvOrigin: SIMD2(0, 0), uvSize: SIMD2(1 / Float(max(texWidth, 1)), 1 / Float(max(texHeight, 1))))
+    }
+
     func glyph(for scalar: UInt32, font: NSFont, device: MTLDevice) -> AtlasGlyph? {
         if let hit = map[scalar] { return hit }
         if extraCount >= extraCap { return nil }

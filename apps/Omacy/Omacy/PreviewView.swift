@@ -1,1 +1,3 @@
-// Preview is OmacyHostView via PreviewViewRepresentable.
+import AppKit
+
+final class PreviewView: OmacyHostView {}

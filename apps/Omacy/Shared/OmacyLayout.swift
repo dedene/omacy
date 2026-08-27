@@ -12,8 +12,23 @@ enum OmacyLayout {
         return CGSize(width: max(width, 1), height: max(font.pointSize, 1))
     }
 
+    static func grid(view: NSView, font: NSFont) -> (cols: UInt32, rows: UInt32, cell: CGSize, origin: CGPoint) {
+        let scale = view.window?.backingScaleFactor ?? view.layer?.contentsScale ?? 2
+        let backing = view.convertToBacking(view.bounds.size)
+        return grid(viewSize: view.bounds.size, backing: backing, scale: scale, font: font)
+    }
+
     static func grid(viewSize: CGSize, scale: CGFloat, font: NSFont) -> (cols: UInt32, rows: UInt32, cell: CGSize, origin: CGPoint) {
-        let points = treatedAsPoints(viewSize: viewSize, scale: scale)
+        grid(viewSize: viewSize, backing: CGSize(width: viewSize.width * scale, height: viewSize.height * scale), scale: scale, font: font)
+    }
+
+    static func grid(
+        viewSize: CGSize,
+        backing: CGSize,
+        scale: CGFloat,
+        font: NSFont
+    ) -> (cols: UInt32, rows: UInt32, cell: CGSize, origin: CGPoint) {
+        let points = treatedAsPoints(viewSize: viewSize, backing: backing, scale: scale)
         let cell = cellSize(font: font)
         var cols = max(Self.minCells, Int(floor(points.width / cell.width)))
         var rows = max(Self.minCells, Int(floor(points.height / cell.height)))
@@ -34,8 +49,14 @@ enum OmacyLayout {
     }
 
     /// Tahoe may hand backing pixels as bounds. An exact 2× jump vs backingScale is scale, not a giant canvas.
-    static func treatedAsPoints(viewSize: CGSize, scale: CGFloat) -> CGSize {
-        guard scale == 2 else { return viewSize }
+    static func treatedAsPoints(viewSize: CGSize, backing: CGSize, scale: CGFloat) -> CGSize {
+        guard scale > 1 else { return viewSize }
+        if abs(backing.width - viewSize.width * scale) < 1, abs(backing.height - viewSize.height * scale) < 1 {
+            return viewSize
+        }
+        if abs(backing.width - viewSize.width) < 1, abs(backing.height - viewSize.height) < 1 {
+            return CGSize(width: viewSize.width / scale, height: viewSize.height / scale)
+        }
         return viewSize
     }
 }
