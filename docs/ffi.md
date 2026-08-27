@@ -19,7 +19,7 @@ typedef enum {
 } omacy_status;
 ```
 
-Effect completion is **not** an error. A successful `step` always publishes a grid. If the current effect ended, `needs_begin_next` is set and the next effect is **not** constructed until `begin_next` (after Swift has applied font + `resize`).
+Effect completion is **not** an error. A successful `step` always publishes a grid. Completion enters `WAITING_FOR_BEGIN` (`needs_begin_next = 1`). The next effect is constructed only by `begin_next`.
 
 ### Signature classes and panic fallbacks
 
@@ -34,6 +34,28 @@ Every `extern "C"` entry is wrapped in `catch_unwind`. Unwind never crosses FFI.
 
 `OMACY_ERR_DEAD`: session panicked earlier (or was otherwise marked dead). Legal calls: `destroy`, `error_message`, `generation`. Illegal: `step`, `resize`, `set_pending_config`, `begin_next` → `OMACY_ERR_DEAD` with no mutation.
 
+## Session states
+
+A live session is exactly one of:
+
+| State | Meaning |
+|---|---|
+| `RUNNING` | A current effect exists. `step` may advance it. |
+| `WAITING_FOR_BEGIN` | The current effect has ended. Selected content is already applied. The next effect is not constructed. |
+| `DEAD` | Panic (or equivalent). Only diagnostics + `destroy`. |
+
+```
+create OK ──────────────────────────────► RUNNING
+RUNNING + step, effect still going ─────► RUNNING
+RUNNING + step, effect ends ────────────► WAITING_FOR_BEGIN
+WAITING_FOR_BEGIN + step ───────────────► WAITING_FOR_BEGIN   (republish)
+WAITING_FOR_BEGIN + begin_next OK ──────► RUNNING
+WAITING_FOR_BEGIN + begin_next fail ────► WAITING_FOR_BEGIN   (unchanged)
+any panic ──────────────────────────────► DEAD
+```
+
+`resize` and `set_pending_config` do not change this state. `needs_begin_next` is 1 iff the session is `WAITING_FOR_BEGIN`.
+
 ## Config structs
 
 Strings are **pointer + length**. Length is authoritative. A null pointer is allowed only with `len == 0` (absent). Null + `len > 0` is `OMACY_ERR_INVALID_ARG`. Pointers need not be NUL-terminated; the implementation must not read past `len`.
@@ -43,7 +65,7 @@ Strings are **pointer + length**. Length is authoritative. A null pointer is all
 Geometry is **not** in these structs. `resize` is the only call that changes `cols`/`rows`. Boundary updates always keep the current dimensions.
 
 ```c
-/* Content at create. No geometry. */
+/* Content at create. No geometry. config_dir is create-only. */
 typedef struct {
   const uint8_t *config_dir;   /* UTF-8 App Group path, optional */
   size_t         config_dir_len;
@@ -57,47 +79,48 @@ typedef struct {
   uint64_t       seed;
 } OmacySessionConfig;
 
-/* Replaceable user settings. No geometry. No seed (seed is create-only). */
+/* Replaceable user settings. No geometry, no seed, no config_dir. */
 typedef struct {
-  const uint8_t *config_dir;
-  size_t         config_dir_len;
-  const uint8_t *ascii;
+  const uint8_t *ascii;        /* empty = keep current art when applied */
   size_t         ascii_len;
-  const uint8_t *effect;
+  const uint8_t *effect;       /* required: "random" or a ttfx name */
   size_t         effect_len;
   uint8_t        bg_r, bg_g, bg_b, bg_a;
   uint8_t        _pad[3];
 } OmacyPendingConfig;
 
-typedef enum {
-  OMACY_ASCII_BRAILLE = 0,
-  OMACY_ASCII_BLOCK = 1
-} omacy_ascii_mode;
+#define OMACY_ASCII_BRAILLE 0u
+#define OMACY_ASCII_BLOCK   1u
 
 typedef struct {
-  omacy_ascii_mode mode;
-  uint32_t         width;      /* conversion columns, not the live grid */
-  uint32_t         height;     /* conversion rows, not the live grid */
-  uint8_t          threshold;  /* 0–100 */
-  uint8_t          invert;     /* 0 or 1 */
-  uint8_t          trim;       /* 0 or 1 */
-  uint8_t          _pad;
+  uint32_t mode;       /* OMACY_ASCII_BRAILLE or OMACY_ASCII_BLOCK */
+  uint32_t width;      /* conversion columns, not the live grid */
+  uint32_t height;     /* conversion rows, not the live grid */
+  uint8_t  threshold;  /* 0–100 */
+  uint8_t  invert;     /* 0 or 1 */
+  uint8_t  trim;       /* 0 or 1 */
+  uint8_t  _pad;
 } OmacyAsciiConfig;
 ```
 
 `OmacyAsciiConfig.width` / `height` are the **image-to-text** target, not the session canvas.
 
+`config_dir` is create-only. Later disk reloads always use that path. `OmacyPendingConfig` cannot change it.
+
 Validation on `OmacySessionConfig` / `OmacyPendingConfig` (all `INVALID_ARG` unless noted `LIMIT`):
 
 - `effect` is `"random"` or a known ttfx name (exact, lowercase).
 - `has_seed` is 0 or 1 (`SessionConfig` only).
-- `ascii` present, or `config_dir` present, or both. If both, inline `ascii` is the art; `config_dir` is used for later disk reloads of art/effect/background only.
-- UTF-8 well-formed for every non-empty string.
+- SessionConfig: `ascii` present, or `config_dir` present, or both. If both, inline `ascii` is the art; `config_dir` is used for later disk reloads of art/effect/background only.
+- PendingConfig: `effect` required; empty `ascii` means keep the current art when the pending packet is applied.
+- UTF-8 well-formed for every non-empty string. ASCII art is unstyled: no `ESC` (0x1B). `ESC` → `INVALID_ARG`.
 - Neither struct may carry `cols`/`rows`/`fontSize`. Those fields do not exist.
 
 `create` also takes `cols` and `rows` as separate arguments (same caps as `resize`).
 
-`OmacyAsciiConfig`: `mode` is a declared enumerator; `width`/`height` ≥ 1 and in cap; `threshold` ≤ 100; `invert`/`trim` are 0 or 1.
+`OmacyAsciiConfig`: `mode` is `OMACY_ASCII_BRAILLE` or `OMACY_ASCII_BLOCK`; `width` 1…256; `height` 1…128; `width * height` ≤ 32_768 (checked); `threshold` ≤ 100; `invert`/`trim` are 0 or 1.
+
+Layout is fixed-width, not a C `enum` type. The crate asserts `size_of` / `align_of` / field offsets for `OmacyCell` (16 / 4), `OmacyAsciiConfig` (16 / 4), `OmacyFrame`, and `OmacyStepResult` against the C header. cbindgen must emit `uint32_t mode`.
 
 ## Cell
 
@@ -108,13 +131,15 @@ typedef struct {
   uint32_t glyph;     /* Unicode scalar. 0 if !has_glyph. SPACE (0x20) is a real glyph. */
   uint8_t  fg_r, fg_g, fg_b, fg_a;
   uint8_t  bg_r, bg_g, bg_b, bg_a;
-  uint8_t  flags;     /* bit0 bold, bit1 italic, bit2 underline; bit3 reserved 0 */
+  uint8_t  flags;     /* reserved; fill_grid writes 0 */
   uint8_t  occupancy; /* bit0 has_background, bit1 has_glyph */
   uint8_t  _pad[2];
 } OmacyCell;
 ```
 
 **Occupancy** is the post-style occupancy Metal consumes. Terminal `reverse` is **not** a renderer concern.
+
+Pinned ttfx **v0.3.2** effect files never set bold, italic, or underline. Those bits appear only if input art carries preexisting SGR, which this ABI rejects. MVP publishes `flags = 0`. Metal must not read `flags`. Bold / italic / underline are out of the MVP ABI.
 
 | occupancy | Meaning | Draw |
 |---|---|---|
@@ -127,7 +152,7 @@ typedef struct {
 
 ### Reverse, resolved in `fill_grid`
 
-`fill_grid` applies reverse **before** writing occupancy and colors. Published `flags` bit3 is always 0. Metal must not swap colors.
+`fill_grid` applies reverse **before** writing occupancy and colors. Published `flags` is always 0. Metal must not swap colors.
 
 Let `term_bg` be the session background (default `#000000`). Let `ink` be the visual’s fg if present, else a default ink of `#ffffff`.
 
@@ -140,7 +165,7 @@ Let `term_bg` be the session background (default `#000000`). Let `ink` be the vi
    - Set `has_background`.
 5. Else: `has_background` iff original visual had a background color.
 6. `has_glyph` iff the symbol is non-empty and not a space (U+0020). Spaces never set `has_glyph`; their fill is occupancy background only.
-7. Write resolved fg/bg (alpha 255 when that channel is present, else 0), occupancy, flags without reverse.
+7. Write resolved fg/bg (alpha 255 when that channel is present, else 0), occupancy, `flags = 0`.
 
 Consequence: glyph-only + reverse produces a **background quad** (original ink as fill) and a glyph colored with `term_bg`. That is the required reverse-video cell.
 
@@ -162,7 +187,14 @@ Row-major. **Origin is top-left.** Index `row * cols + col`. Row 0 is the visual
 
 ## Pointer lifetime
 
-`cells` is borrowed from the session. Valid until the next **mutating** call on that session that returns `OMACY_OK` (`step` success, `resize` success, `destroy`). Failed calls that do not mutate (see postconditions) leave a previously published pointer valid.
+`cells` is borrowed from the session. Valid until the next **frame-buffer-mutating** call on that session that returns `OMACY_OK`:
+
+- `step` success
+- `resize` success
+- `begin_next` success
+- `destroy`
+
+`set_pending_config` mutates pending content and does **not** invalidate `cells`. Recoverable `begin_next` failure does not replace storage and does **not** invalidate `cells`. Failed calls that do not mutate the frame buffer leave a previously published pointer valid.
 
 Swift uploads to Metal (or copies) before returning from the main-thread display-link callback that called `step`. Storing the pointer on the view is a contract violation.
 
@@ -171,7 +203,7 @@ Swift uploads to Metal (or copies) before returning from the main-thread display
 ```c
 typedef struct {
   OmacyFrame frame;
-  uint8_t    needs_begin_next; /* 1 = effect ended; last frame is in `frame` */
+  uint8_t    needs_begin_next; /* 1 iff WAITING_FOR_BEGIN; last frame is in `frame` */
   uint8_t    _pad[3];
 } OmacyStepResult;
 
@@ -190,31 +222,39 @@ void         omacy_session_destroy(OmacySession *s);
 const char  *omacy_status_string(omacy_status status);
 ```
 
-`create`: main thread. Validate + deep-copy `cfg`. Validate `cols`/`rows` (caps). Build the first effect on those dimensions. On `OMACY_OK`, `*out` is non-null; no frame until `step`. On failure, `*out` is NULL. Off the main thread → `OMACY_ERR_WRONG_THREAD` and `*out` is NULL.
+`create`: main thread. Validate + deep-copy `cfg`. Validate `cols`/`rows` (caps). Build the first effect on those dimensions. Session starts `RUNNING`, `generation = 0`. On `OMACY_OK`, `*out` is non-null; no frame until `step`. On failure, `*out` is NULL. Off the main thread → `OMACY_ERR_WRONG_THREAD` and `*out` is NULL.
 
-`step`: main thread. Accumulate 60 Hz (architecture.md). If the effect ends this call: apply **boundary content** (below) **without changing geometry**, set `needs_begin_next = 1`, do **not** construct the next effect, publish the last frame. Otherwise `needs_begin_next = 0`. On failure, `out->frame` is zeroed (`cells` NULL) and `needs_begin_next = 0`.
+`step` (`RUNNING`): main thread. Accumulate 60 Hz (architecture.md). If the effect ends this call: apply **boundary content** (below) **without changing geometry**, cache the last frame, enter `WAITING_FOR_BEGIN`, set `needs_begin_next = 1`, do **not** construct the next effect, publish the last frame. Otherwise stay `RUNNING`, `needs_begin_next = 0`. On failure, `out->frame` is zeroed (`cells` NULL) and `needs_begin_next = 0`.
 
-`resize`: main thread. The **only** operation that changes geometry. On `OMACY_OK`, rebuild `EngineCtx` at the new size; previous `cells` pointer is invalid; no frame published (next `step` or `begin_next` publishes). On failure without rebuild: previous pointer remains valid, dimensions unchanged. Calling `resize` while `needs_begin_next` is set is allowed and expected (Swift applies font-driven size before `begin_next`).
+`step` (`WAITING_FOR_BEGIN`): main thread. Republish the cached frame with `needs_begin_next = 1`. Do **not** advance, do **not** touch the 60 Hz accumulator, do **not** reload disk, do **not** consume pending, do **not** change `generation`. Reject NaN / negative / infinite `elapsed` as `INVALID_ARG` without leaving this state and without changing the cache. After a successful `resize` in this state, the cache is an unpainted grid at the new size; republish that.
 
-`set_pending_config`: main thread. Validate + deep-copy into `pending`. No geometry. On failure, pending is unchanged. Does not publish or invalidate `cells`. Applied as content at the next effect boundary, never as a resize.
+`resize`: main thread. The **only** operation that changes geometry. Legal in `RUNNING` and `WAITING_FOR_BEGIN`. On `OMACY_OK`, rebuild storage at the new size; previous `cells` pointer is invalid; no frame published (the next `step` publishes). State is unchanged. On failure without rebuild: previous pointer remains valid, dimensions unchanged.
 
-`begin_next`: main thread. Legal only when `needs_begin_next` is set; otherwise `OMACY_ERR_INVALID_ARG`. Constructs the next effect on the **current** `cols`/`rows` (post-`resize` if Swift just called it). Increments `generation`. Clears `needs_begin_next`. Does not publish a frame; the next `step` does.
+`set_pending_config`: main thread. Legal in `RUNNING` and `WAITING_FOR_BEGIN`. Validate + deep-copy into `pending`. No geometry. On failure, pending is unchanged. Does not publish or invalidate `cells`. Queued while `RUNNING` applies at the next boundary (the step that enters `WAITING_FOR_BEGIN`). Queued **after** entering `WAITING_FOR_BEGIN` applies at the **following** boundary, not the imminent `begin_next`.
+
+`begin_next`: main thread. Legal only in `WAITING_FOR_BEGIN`; otherwise `OMACY_ERR_INVALID_ARG`. Atomic:
+
+- **Success:** construct the next effect from **selected** content (applied when entering wait) on the **current** `cols`/`rows`. Install it. Increment `generation`. Enter `RUNNING`. Invalidate the previous `cells` pointer. Do not publish a frame; the next `step` does.
+- **Recoverable failure** (`ENGINE`, `LIMIT`, `INVALID_ARG` after a construct attempt): do not install. Selected content and geometry unchanged. `generation` unchanged. Stay `WAITING_FOR_BEGIN`. Previous `cells` remains valid. An identical retry is legal.
+- **Panic:** `OMACY_ERR_PANIC`, session `DEAD`.
 
 `generation`: main thread. Allowed on a dead session (last generation). Writes `*out`. On null `s`/`out`: `OMACY_ERR_NULL` and does not write if `out` is null.
 
-`error_message`: main thread. Allowed on a dead session. Copies a truncated, always-NUL-terminated message. `s == NULL` reads **thread-local** last error. `buf == NULL` → `OMACY_ERR_NULL`.
+`error_message`: main thread. Allowed on a dead session. Copies a truncated, always-NUL-terminated message. `s == NULL` reads **thread-local** last error. `buf == NULL` → `OMACY_ERR_NULL`. `buf_len < 1` → `OMACY_ERR_INVALID_ARG` (NUL termination is impossible). `buf_len >= 1` writes at most `buf_len - 1` payload bytes and `buf[written] = 0`.
 
 `destroy`: main thread. `NULL` is a no-op. Wrong thread: **no-op**, TLS `OMACY_ERR_WRONG_THREAD`. Swift must call `destroy` on the main thread **before** invalidating the display link or tearing down the renderer.
 
-### Boundary content (effect end, inside `step`, before `needs_begin_next`)
+### Boundary content (effect end, inside the `step` that enters `WAITING_FOR_BEGIN`)
 
-Applies art / effect name / background only. **Never** writes `cols`/`rows`.
+Applies art / effect name / background only. **Never** writes `cols`/`rows`. Runs **once** on the transition into wait. Later `step`s in wait do not run this.
 
 Exactly one of:
 
-1. If `pending` is set (successful `set_pending_config` since last boundary): apply those content fields, clear pending. **Do not** read disk.
-2. Else if `config_dir` is non-empty: read `screensaver.txt` and the engine keys of `settings.json` (`effect`, `background` only). Ignore `fontSize`, `asciiMode`, `threshold`, `invert`. Validate; on failure keep last-known-good content.
-3. Else: keep in-memory content.
+1. If `pending` is set (successful `set_pending_config` since last boundary, and it was queued **before** this transition): apply those content fields, clear pending. **Do not** read disk. That packet becomes **selected** content.
+2. Else if `config_dir` is non-empty: read `screensaver.txt` and the engine keys of `settings.json` (`effect`, `background` only). Ignore `fontSize`, `asciiMode`, `threshold`, `invert`. Validate; on failure keep last-known-good content. That result becomes selected.
+3. Else: keep in-memory content as selected.
+
+`begin_next` uses selected content. A `set_pending_config` that arrives while already waiting stays queued for the next transition into wait.
 
 Disk and pending configs have no dimensions. A resize queued-then-applied cannot happen because geometry is not in those structs.
 
@@ -224,7 +264,7 @@ Every **production** session is owned by the process main thread (`@MainActor` i
 
 Every later session function except `omacy_status_string` requires that same thread (the main thread). Mismatch → `OMACY_ERR_WRONG_THREAD` (or the void/pointer fallbacks). **No mutex. No hop onto an arbitrary “display-link thread.”** An `NSView.displayLink` does not give you a dispatch queue.
 
-The display link is added to the **main run loop** (`.main`, `.common`). Its callback runs on the main thread and may call `step`.
+The display link is added to the **main run loop** (`.main`, `.common`). Its callback runs on the main thread and may call `step`. A callback that lands in `WAITING_FOR_BEGIN` republishes; it does not error.
 
 Teardown, on the main thread, in this order:
 
@@ -253,7 +293,7 @@ const char  *omacy_text_utf8(const OmacyText *t);
 size_t       omacy_text_len(const OmacyText *t);
 ```
 
-`ascii_from_bytes` validates + deep-copies `cfg` before work. On `OMACY_OK`, `*out` is non-null. On failure, `*out` is NULL. Limit → `OMACY_ERR_LIMIT`.
+`ascii_from_bytes` validates + deep-copies `cfg` before work. On `OMACY_OK`, `*out` is non-null. On failure, `*out` is NULL. Over conversion limits → `OMACY_ERR_LIMIT`.
 
 `text_utf8` is valid until `text_free`. `text_free(NULL)` is a no-op. `text_utf8(NULL)` is `NULL`. `text_len(NULL)` is `0`.
 

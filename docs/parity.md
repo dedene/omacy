@@ -24,15 +24,33 @@ Vendoring **may not start** until these SHAs are the recorded pins (update this 
 For each checked step:
 
 1. `advance` once on the engine (same seed, canvas, input).
-2. **Oracle:** take `get_formatted_output_string()` (the existing ANSI emission path, independent of `fill_grid`). Decode SGR (including reverse `7` / `27`, 24-bit and xterm color) into canonical `OmacyCell`s with the same occupancy rules as [ffi.md](ffi.md) (top-left remap). The decoder lives in **tests only**.
+2. **Oracle:** take `get_formatted_output_string()` (the existing ANSI emission path, independent of `fill_grid`). Decode supported SGR into canonical `OmacyCell`s with the same occupancy rules as [ffi.md](ffi.md) (top-left remap). The decoder lives in **tests only**.
 3. **SUT:** `fill_grid` into a packed buffer.
-4. Compare occupancy, glyph, RGB, flags. Alpha is 0 or 255 only in MVP. Accepted differences: none.
+4. Compare occupancy, glyph, RGB. `flags` must be 0. Alpha is 0 or 255 only in MVP. Accepted differences: none.
 
-Do not implement the oracle by calling `fill_grid`. The decoder models a terminal pen (fg, bg, reverse, bold) from SGR, then snapshots to `OmacyCell` using the occupancy rules in [ffi.md](ffi.md). That snapshot logic is a **second implementation** of the ABI, not a shared function with `fill_grid`. If they disagree, `fill_grid` is wrong unless a hand-written ANSI unit test shows the decoder misreads SGR.
+The oracle is a **row-oriented SGR decoder**, not a VT emulator. Rows are `\n`-separated. It does not implement CUP / cursor saves.
 
-Asymmetric fixture remains: top-right non-space glyph, bottom-left space with non-black background. Fail on swap or occupancy 0 on that blank.
+Supported SGR (these change the pen or occupancy):
 
-Reverse fixtures: four occupancy combinations × reverse on/off, compared to the ANSI oracle (not to `fill_grid` goldens).
+| Sequence | Meaning |
+|---|---|
+| `0` | Reset |
+| `7` / `27` | Reverse on / off |
+| `30–37` / `90–97` | 16-color fg |
+| `40–47` / `100–107` | 16-color bg |
+| `38;5;n` / `48;5;n` | xterm-256 fg / bg |
+| `38;2;r;g;b` / `48;2;r;g;b` | 24-bit fg / bg |
+| `39` / `49` | Default fg / bg |
+
+Parsed and discarded (must not fail the decoder, must not set `flags`): `1` / `22` (bold), `3` / `23` (italic), `4` / `24` (underline).
+
+Do not implement the oracle by calling `fill_grid`. The decoder models a terminal pen (fg, bg, reverse) from SGR, then snapshots to `OmacyCell` using the occupancy rules in [ffi.md](ffi.md). That snapshot logic is a **second implementation** of the ABI, not a shared function with `fill_grid`. If they disagree, `fill_grid` is wrong unless a hand-written ANSI unit test shows the decoder misreads SGR.
+
+Committed raw ANSI under `assets/fixtures/ansi-oracle/` exercises every sequence above. Each file is the oracle input; expected occupancy/colors are in `manifest.md` beside them. Tests must load these files, not reconstruct the bytes in Rust.
+
+Asymmetric fixture remains: top-right non-space glyph, bottom-left space with non-black background (`origin-asymmetric.ans`). Fail on swap or occupancy 0 on that blank.
+
+Reverse fixtures: four occupancy combinations × reverse on/off (`occupancy-four.ans`, `sgr-reverse.ans`), compared to the ANSI oracle (not to `fill_grid` goldens).
 
 ## Clock policy
 

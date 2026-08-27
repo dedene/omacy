@@ -4,7 +4,7 @@ A macOS screensaver that plays Omarchy’s ASCII text-effects loop: your logo (o
 
 Rust `ttfx` engine, Swift/Metal view, Aerial-style host app + screensaver extension.
 
-**Status:** architecture only (revision 4). Spec: [docs/architecture.md](docs/architecture.md), [docs/ffi.md](docs/ffi.md), [docs/parity.md](docs/parity.md).
+**Status:** architecture only (revision 5). Spec: [docs/architecture.md](docs/architecture.md), [docs/ffi.md](docs/ffi.md), [docs/parity.md](docs/parity.md).
 
 ## Credits
 
