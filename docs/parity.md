@@ -26,7 +26,7 @@ For each checked step:
 1. `advance` once on the engine (same seed, canvas, input).
 2. **Oracle:** take `get_formatted_output_string()` (the existing ANSI emission path, independent of `fill_grid`). Decode supported SGR into canonical `OmacyCell`s with the same occupancy rules as [ffi.md](ffi.md) (top-left remap). The decoder lives in **tests only**.
 3. **SUT:** `fill_grid` into a packed buffer.
-4. Compare occupancy, glyph, RGB. `flags` must be 0. Alpha is 0 or 255 only in MVP. Accepted differences: none.
+4. Compare occupancy, glyph, RGB. `flags` must be 0. Alpha is 0 or 255 only in MVP. Accepted differences: none. Published `clear_*` is the current effect background used as `term_bg` for reverse; it is not a per-cell field.
 
 The oracle is a **row-oriented SGR decoder**, not a VT emulator. Rows are `\n`-separated. It does not implement CUP / cursor saves.
 
