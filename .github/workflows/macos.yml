@@ -1,0 +1,46 @@
+name: macos
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  host:
+    # PaperSaver 0.2.0 is swift-tools-version 6.2. macos-15 ships Xcode 16 / Swift 6.1.
+    # Deployment target stays 15.0; this runner is only the compile host (Peter develops on Tahoe).
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.88.0
+          targets: aarch64-apple-darwin
+      - name: Show compilers
+        run: |
+          xcodebuild -version
+          swift --version
+          rustc --version
+          cargo --version
+      - name: Build host app and screensaver appex
+        working-directory: apps/Omacy
+        run: |
+          export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
+          xcodebuild \
+            -project Omacy.xcodeproj \
+            -scheme Omacy \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -skipMacroValidation \
+            -skipPackagePluginValidation \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
+            EXCLUDED_ARCHS=x86_64 \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="" \
+            ENABLE_HARDENED_RUNTIME=NO \
+            build

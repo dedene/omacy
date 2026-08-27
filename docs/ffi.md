@@ -129,6 +129,9 @@ Layout is fixed-width, not a C `enum` type. The crate asserts `size_of` / `align
 16 bytes, `#[repr(C)]`, little-endian.
 
 ```c
+#define OMACY_CELL_HAS_BACKGROUND 1  /* occupancy bit0 */
+#define OMACY_CELL_HAS_GLYPH      2  /* occupancy bit1 */
+
 typedef struct {
   uint32_t glyph;     /* Unicode scalar. 0 if !has_glyph. Spaces never set has_glyph. */
   uint8_t  fg_r, fg_g, fg_b, fg_a;
