@@ -9,3 +9,4 @@ ts	phase	decision	why	evidence	result
 2026-08-27T17:06:12Z	impl	appex per-display loadView + duplicate pluginkit warning	Settings preview 30Hz and multi-display need the real frame; PlugInKit sticky if two locations	apps/Omacy/OmacyScreensaver/OmacySaverViewController.swift PluginManager.swift	in-progress
 2026-08-27T17:15:04Z	ci	add macos-15 xcodebuild of host+appex	Linux cannot compile Swift; a GitHub Mac runner can prove the Aerial-path targets link	.github/workflows/macos.yml	in-progress
 2026-08-27T17:37:02Z	ci	macos-26 xcodebuild + renderer NSObject + cargo PATH	PaperSaver 0.2.0 needs Swift 6.2; macos-15 was 6.1; Xcode scripts drop ~/.cargo/bin; displayLink needs NSObject	.github/workflows/macos.yml apps/Omacy/scripts/build-engine.sh OmacyRenderer.swift	in-progress
+2026-08-27T17:49:00Z	ci	one rust build phase (appex)	macos-26 failed: both targets wrote libomacy_engine.a; host already depends on appex	apps/Omacy/Omacy.xcodeproj/project.pbxproj	in-progress

@@ -6,7 +6,7 @@ Host sources now include last-known-good App Group writes, stop-before-start lif
 
 | Check | Status here |
 |---|---|
-| Host + appex compile (Xcode, ad-hoc) | Workflow on `macos-26` (Swift 6.2; PaperSaver 0.2.0). `macos-15` failed: tools 6.1 vs 6.2. Result pending this run |
+| Host + appex compile (Xcode, ad-hoc) | `macos-26` resolves PaperSaver; failed on duplicate `libomacy_engine.a` from two “Build Rust engine” phases. Script now only on the appex (host depends on it). Result pending |
 | Install: DMG → `/Applications` or Xcode DerivedData | Unverified |
 | Discover: listed with first-party savers in System Settings | Unverified |
 | Thumbnail 107×65 / 214×130 | Landscape canary fixture PNGs present; System Settings listing unverified |

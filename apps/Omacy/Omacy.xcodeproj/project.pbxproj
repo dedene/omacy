@@ -262,7 +262,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 1A00001B000000000000000A /* Build configuration list for PBXNativeTarget "Omacy" */;
 			buildPhases = (
-				1A0000D0000000000000000A /* Build Rust engine */,
 				1A00001C000000000000000A /* Sources */,
 				1A000012000000000000000A /* Frameworks */,
 				1A00001D000000000000000A /* Resources */,
@@ -348,26 +347,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		1A0000D0000000000000000A /* Build Rust engine */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Build Rust engine";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(BUILT_PRODUCTS_DIR)/libomacy_engine.a",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "sh \"${SRCROOT}/scripts/build-engine.sh\"\n";
-		};
 		1A0000D1000000000000000A /* Build Rust engine */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
