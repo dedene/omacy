@@ -4,7 +4,7 @@ A macOS screensaver that plays Omarchy’s ASCII text-effects loop: your logo (o
 
 Rust `ttfx` engine, Swift/Metal view, Aerial-style host app + screensaver extension.
 
-**Status:** engine implemented and tested on Linux. Host `.app` + `com.apple.screensaver` `.appex` sources are in `apps/Omacy`. Idle / System Settings listing remains a Mac gate: [docs/macos-gates.md](docs/macos-gates.md).
+**Status:** engine tested (`cargo test -p omacy-engine`). Host `.app` + `com.apple.screensaver` `.appex` compile on Xcode 26.6. Idle / System Settings listing remains a Mac gate: [docs/macos-gates.md](docs/macos-gates.md).
 
 Spec: [docs/architecture.md](docs/architecture.md), [docs/ffi.md](docs/ffi.md), [docs/parity.md](docs/parity.md).
 

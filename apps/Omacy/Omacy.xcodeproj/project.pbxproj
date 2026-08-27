@@ -591,7 +591,6 @@
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
-					"-lomacy_engine",
 					"-lc++",
 					"-framework",
 					Security,
@@ -639,7 +638,6 @@
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
-					"-lomacy_engine",
 					"-lc++",
 					"-framework",
 					Security,
@@ -696,7 +694,6 @@
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
-					"-lomacy_engine",
 					"-lc++",
 					"-framework",
 					Security,
@@ -753,7 +750,6 @@
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
-					"-lomacy_engine",
 					"-lc++",
 					"-framework",
 					Security,

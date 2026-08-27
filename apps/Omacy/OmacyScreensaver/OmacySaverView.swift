@@ -27,7 +27,7 @@ final class OmacySaverView: ScreenSaverView {
     }
 
     deinit {
-        teardown()
+        // teardown() is @MainActor (OmacyRenderer). stopAnimation / window-nil already ran.
         logger.info("deinit")
     }
 

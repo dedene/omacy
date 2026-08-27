@@ -1,3 +1,3 @@
 import AppKit
 
-final class PreviewView: OmacyHostView {}
+typealias PreviewView = OmacyHostView

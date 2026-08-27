@@ -88,9 +88,4 @@ final class OmacyHostView: NSView {
     @objc private func configDidChange() {
         applyPendingConfig()
     }
-
-    deinit {
-        renderer.stop()
-        canary.stop()
-    }
 }
