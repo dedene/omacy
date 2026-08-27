@@ -60,3 +60,9 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# Rust
+target/
+
+# Vendored checkouts (submodule content is tracked; local build artifacts aren’t)
+vendor/ttfx/target/
