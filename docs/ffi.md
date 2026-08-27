@@ -64,7 +64,7 @@ Strings are **pointer + length**. Length is authoritative. A null pointer is all
 
 `create` and `set_pending_config` **validate and deep-copy** every field into session-owned storage **before returning**. After `OMACY_OK`, the caller may immediately free or reuse the pointed-to memory. After any error, the session’s pending/current content config is unchanged (create: no session).
 
-Geometry is **not** in these structs. `resize` is the only call that changes `cols`/`rows`. Boundary updates always keep the current dimensions.
+Geometry is **not** in these structs. `resize` is the only call that *requests* a geometry change. Current `cols`/`rows` change only when a `WAITING_FOR_BEGIN` `resize` applies, or when `begin_next` consumes `pending_geometry`. Boundary **content** updates never write dimensions.
 
 ```c
 /* Content at create. No geometry. config_dir is create-only. */
@@ -130,7 +130,7 @@ Layout is fixed-width, not a C `enum` type. The crate asserts `size_of` / `align
 
 ```c
 typedef struct {
-  uint32_t glyph;     /* Unicode scalar. 0 if !has_glyph. SPACE (0x20) is a real glyph. */
+  uint32_t glyph;     /* Unicode scalar. 0 if !has_glyph. Spaces never set has_glyph. */
   uint8_t  fg_r, fg_g, fg_b, fg_a;
   uint8_t  bg_r, bg_g, bg_b, bg_a;
   uint8_t  flags;     /* reserved; fill_grid writes 0 */
@@ -198,17 +198,17 @@ Layout (LP64): `OmacyFrame` is 24 bytes, align 8. The crate asserts size / align
 `cells` is borrowed from the session. Valid until the next **frame-buffer-mutating** call on that session that returns `OMACY_OK`:
 
 - `step` success
-- `resize` success
+- `resize` success **in `WAITING_FOR_BEGIN`** (apply)
 - `begin_next` success
 - `destroy`
 
-`set_pending_config` mutates pending content and does **not** invalidate `cells`. Recoverable `begin_next` failure does not replace storage and does **not** invalidate `cells`. Failed calls that do not mutate the frame buffer leave a previously published pointer valid. Entering `DEAD` invalidates every previously published pointer.
+`resize` success in `RUNNING` stores `pending_geometry` and does **not** invalidate `cells`. `set_pending_config` mutates pending content and does **not** invalidate `cells`. Recoverable `begin_next` failure does not replace storage and does **not** invalidate `cells`. Failed calls that do not mutate the frame buffer leave a previously published pointer valid. Entering `DEAD` invalidates every previously published pointer.
 
 Required display-link order on the main thread:
 
 1. `step`
 2. Synchronously upload or copy `out->frame` (cells **and** `clear_*`)
-3. Then, if `needs_begin_next`: apply font, `resize`, `begin_next`
+3. Then, if `needs_begin_next`: apply font, `resize` (applies `pending_geometry` / new cell counts), `begin_next`
 
 Present this callback’s frame (the completed effect’s last frame when entering wait). The new effect publishes on the **next** callback. Storing the `cells` pointer on the view is a contract violation.
 
@@ -240,18 +240,23 @@ const char  *omacy_status_string(omacy_status status);
 
 `step`: if `out == NULL` → `OMACY_ERR_NULL`. Do not dereference `out`. Session state is unchanged.
 
-`step` (`RUNNING`): main thread. Accumulate 60 Hz (architecture.md). If the effect ends this call: `fill_grid` the last frame using the **current** background as `clear_*` / `term_bg`, cache that frame, reset the 60 Hz accumulator to 0, apply **boundary content** into `selected_next` (below) **without changing geometry and without rewriting the cache**, enter `WAITING_FOR_BEGIN`, set `needs_begin_next = 1`, do **not** construct the next effect, publish the cached frame. Otherwise stay `RUNNING`, `needs_begin_next = 0`. On failure with a non-null `out`: zero `out->frame` (`cells` NULL, `clear_*` 0) and `needs_begin_next = 0`.
+`step` (`RUNNING`): main thread. Accumulate 60 Hz (architecture.md). If the effect ends this call: `fill_grid` the last frame using the **current** background as `clear_*` / `term_bg`, cache that frame, reset the 60 Hz accumulator to 0, apply **boundary content** into `selected_next` (below) **without changing geometry, without applying `pending_geometry`, and without rewriting the cache**, enter `WAITING_FOR_BEGIN`, set `needs_begin_next = 1`, do **not** construct the next effect, publish the cached frame. Otherwise stay `RUNNING`, `needs_begin_next = 0`. On failure with a non-null `out`: zero `out->frame` (`cells` NULL, `clear_*` 0) and `needs_begin_next = 0`.
 
-`step` (`WAITING_FOR_BEGIN`): main thread. Republish the cached frame (same `clear_*`) with `needs_begin_next = 1`. Do **not** advance, do **not** touch the accumulator (already 0), do **not** reload disk, do **not** consume pending, do **not** change `generation`. Reject NaN / negative / infinite `elapsed` as `INVALID_ARG` without leaving this state and without changing the cache; if `out` is non-null, zero the published result. After a successful `resize` in this state, the cache is an unpainted grid at the new size with the **same captured `clear_*`**; republish that.
+`step` (`WAITING_FOR_BEGIN`): main thread. Republish the cached frame (same `clear_*`) with `needs_begin_next = 1`. Do **not** advance, do **not** touch the accumulator (already 0), do **not** reload disk, do **not** consume pending content, do **not** apply `pending_geometry`, do **not** change `generation`. Reject NaN / negative / infinite `elapsed` as `INVALID_ARG` without leaving this state and without changing the cache; if `out` is non-null, zero the published result. After a successful `resize` in this state, the cache is an unpainted grid at the new size with the **same captured `clear_*`**; republish that.
 
-`resize`: main thread. The **only** operation that changes geometry. Legal in `RUNNING` and `WAITING_FOR_BEGIN`. On `OMACY_OK`, rebuild storage at the new size; previous `cells` pointer is invalid; no frame published (the next `step` publishes). State is unchanged. On failure without rebuild: previous pointer remains valid, dimensions unchanged.
+`resize`: main thread. The only call that *requests* a geometry change. Legal in `RUNNING` and `WAITING_FOR_BEGIN`. Validate `cols`/`rows` (same caps as `create`). On failure: `pending_geometry` and current dimensions unchanged; `cells` remains valid.
+
+- **`RUNNING`:** store as `pending_geometry` (last successful call wins). Do **not** rebuild the active effect. Do **not** remap characters, paths, or anchors. Do **not** invalidate `cells`. Current `cols`/`rows` stay the construction size. A request equal to the current size clears `pending_geometry`. Mid-effect migration is out of scope.
+- **`WAITING_FOR_BEGIN`:** apply now. Rebuild storage at the new size; previous `cells` pointer is invalid; cache becomes an unpainted grid at the new size with the captured `clear_*`; current `cols`/`rows` update; `pending_geometry` clears. No frame published (the next `step` republishes that cache). State stays `WAITING_FOR_BEGIN`.
+
+`begin_next` consumes any leftover `pending_geometry` (Swift skipped the waiting `resize`) as part of its atomic success path. View margins absorb the temporary size difference until then: center the published grid; extra view area shows `clear_*`; if the grid is larger than the view, clip.
 
 `set_pending_config`: main thread. Legal in `RUNNING` and `WAITING_FOR_BEGIN`. Validate + deep-copy into `pending`. No geometry. On failure, pending is unchanged. Does not publish or invalidate `cells`. Queued while `RUNNING` applies at the next boundary (the step that enters `WAITING_FOR_BEGIN`). Queued **after** entering `WAITING_FOR_BEGIN` applies at the **following** boundary, not the imminent `begin_next`.
 
 `begin_next`: main thread. Legal only in `WAITING_FOR_BEGIN`; otherwise `OMACY_ERR_INVALID_ARG`. Atomic:
 
-- **Success:** construct the next effect from **selected** content (applied when entering wait) on the **current** `cols`/`rows`. Promote `selected_next.background` to the current background. Install the effect. Increment `generation`. Enter `RUNNING` with accumulator 0. Invalidate the previous `cells` pointer. Do not publish a frame; the next `step` does, and that frame’s `clear_*` is the promoted background.
-- **Recoverable failure** (`ENGINE`, `LIMIT`, `INVALID_ARG` after a construct attempt): do not install. Selected content and geometry unchanged. `generation` unchanged. Stay `WAITING_FOR_BEGIN`. Previous `cells` remains valid. An identical retry is legal.
+- **Success:** if `pending_geometry` is set, apply it (same rebuild as a waiting `resize`) as part of this success, not before. Construct the next effect from **selected** content on the **resulting** `cols`/`rows`. Promote `selected_next.background` to the current background. Install the effect. Clear `pending_geometry`. Increment `generation`. Enter `RUNNING` with accumulator 0. Invalidate the previous `cells` pointer. Do not publish a frame; the next `step` does, and that frame’s `clear_*` is the promoted background.
+- **Recoverable failure** (`ENGINE`, `LIMIT`, `INVALID_ARG` after a construct attempt): do not install. Do not apply `pending_geometry`. Selected content, current geometry, and `pending_geometry` unchanged. `generation` unchanged. Stay `WAITING_FOR_BEGIN`. Previous `cells` remains valid. An identical retry is legal.
 - **Panic:** `OMACY_ERR_PANIC`, session `DEAD`.
 
 `generation`: main thread. Allowed on a dead session (last generation). Writes `*out`. On null `s`/`out`: `OMACY_ERR_NULL` and does not write if `out` is null.
@@ -279,7 +284,7 @@ Exactly one of:
 
 `begin_next` uses selected content. A `set_pending_config` that arrives while already waiting stays queued for the next transition into wait.
 
-Disk and pending configs have no dimensions. A resize queued-then-applied cannot happen because geometry is not in those structs.
+Disk and `OmacyPendingConfig` have no dimensions. Geometry uses `pending_geometry` from `resize`, not content packets.
 
 ## Main-thread ownership
 

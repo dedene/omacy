@@ -4,13 +4,13 @@ macOS screensaver that replays Omarchy’s ASCII text-effects loop: a logo (or a
 
 Stack: **patched `ttfx` → C ABI cell grid → Metal renderer → host app + `.appex`.**
 
-Revision 6 of this design. Implementation starts only after this revision is accepted.
+Revision 7 of this design. Implementation starts only after this revision is accepted.
 
 Companion contracts: [ffi.md](ffi.md) (ABI, threading, occupancy, origin) and [parity.md](parity.md) (pins, clock, 37-effect matrix).
 
 ## Goal
 
-When the Mac idles, every connected display runs a `ttfx` effect on a centered ASCII/Braille logo against a black field, then the next effect. Speed is the same on a 60 Hz display and a 120 Hz ProMotion display.
+When the Mac idles, every connected display runs a `ttfx` effect on a centered ASCII/Braille logo against the configured background (black by default), then the next effect. Speed is the same on a 60 Hz display and a 120 Hz ProMotion display.
 
 Configuration lives in the **host app**: paste art, generate art from a PNG/SVG, pick an effect or random, restore the default wordmark. System Settings shows the saver, its thumbnail, and (later) a thin sheet for effect choice — not the image converter. The converter needs `NSOpenPanel`; the appex sandbox did not present that panel.
 
@@ -41,10 +41,10 @@ Fidelity is **measured**, not vibed. Motion is cell-grid identity against an **i
 | Origin | Top-left, rows increase downward | Terminal-internal order is not the ABI |
 | Simulation | Fixed 60 Hz steps, vsync presents | Speed must not track the display |
 | Threading | Main thread / `@MainActor` only | A display link is not a dispatch queue |
-| Geometry | `create(..., cols, rows)` + `resize` only | Pending/disk config must not restore stale size |
+| Geometry | `create` + `resize`; apply in wait | Mid-effect `resize` is `pending_geometry`; no live remapping |
 | Font size | Swift / renderer only | Engine must not start the next effect on an old canvas |
 | Session states | `RUNNING` / `WAITING_FOR_BEGIN` / `DEAD` | Display `step` while waiting republishes; it does not error |
-| Callback order | `step` → upload → font/`resize`/`begin_next` | `resize` and `begin_next` invalidate `cells` |
+| Callback order | `step` → upload → font/`resize`/`begin_next` | Waiting `resize` and `begin_next` invalidate `cells` |
 | Frame clear | `OmacyFrame.clear_*` | Selected next background is not the presented clear |
 | Draw path | Metal glyph atlas + instanced quads | Core Text per cell per frame would dominate CPU |
 | Display link | `NSView.displayLink` on the **main** run loop | Callback is main-thread; destroy before invalidate |
@@ -70,7 +70,7 @@ OmacyRenderer  (@MainActor)
     → step(elapsed)                    // WAITING: republish last frame
     → Metal upload/copy of that frame  // cells + clear_*; before invalidate
     → if needs_begin_next:
-         apply font, resize, begin_next
+         apply font, resize (apply pending_geometry), begin_next
          // new effect publishes on the next callback
        │
        ▼
@@ -140,7 +140,7 @@ Small, upstreamable, parity suites stay green.
 
 Do not fork effect files. Do not change RNG, easing, or painter order.
 
-On effect completion `step` fills and caches the last frame (old background as `clear_*`), resets the accumulator, writes pending/disk **content** into `selected_next` without rewriting that cache, enters `WAITING_FOR_BEGIN`, and stops. It does **not** construct the next effect. Further `step`s republish that cache (`needs_begin_next = 1`) and do not consume a later `set_pending_config`. Swift uploads or copies that frame first, then applies font size, `resize`s if the cell grid changed, and calls `begin_next`. Present the completed effect this callback; the new effect’s first frame is the next callback. Completion is not an error status. `begin_next` is atomic: success installs, promotes `selected_next.background`, and increments `generation`; recoverable failure stays waiting and may be retried; a pending packet queued during wait applies at the *next* boundary.
+On effect completion `step` fills and caches the last frame (old background as `clear_*`, old `cols`/`rows`), resets the accumulator, writes pending/disk **content** into `selected_next` without rewriting that cache or applying `pending_geometry`, enters `WAITING_FOR_BEGIN`, and stops. It does **not** construct the next effect. Further `step`s republish that cache (`needs_begin_next = 1`) and do not consume a later `set_pending_config`. Swift uploads or copies that frame first, then applies font size, `resize`s (this is when `pending_geometry` / new cell counts apply), and calls `begin_next`. Present the completed effect this callback; the new effect’s first frame is the next callback. Completion is not an error status. `begin_next` is atomic: success applies leftover `pending_geometry`, installs, promotes `selected_next.background`, and increments `generation`; recoverable failure stays waiting and may be retried; a pending content packet queued during wait applies at the *next* boundary.
 
 ## Renderer
 
@@ -151,7 +151,7 @@ Layout, from view bounds in **points** and the backing scale factor:
 - `cols = floor(viewWidth / cellWidth)`, `rows = floor(viewHeight / cellHeight)`, both ≥ 1, both capped (see Limits).
 - `cols * rows` uses checked multiplication; overflow is a failed resize, last grid kept.
 - Remainder is margin; it shows `frame.clear_*`. The grid is centered.
-- If `cols,rows` change after a 50 ms debounce, upload the current frame first, then `resize` (invalidates the frame pointer). Font-size changes at a boundary are the same path: upload the completed frame, then Swift owns `fontSize`, recomputes cells, `resize`s, **then** `begin_next`.
+- If `cols,rows` change after a 50 ms debounce, call `resize`. In `RUNNING` that stores `pending_geometry`; the live effect keeps its construction size; `cells` stay valid. Center the published grid in the view; extra area is `frame.clear_*`; clip if the grid is larger than the view. Font-size changes that alter cell counts use the same path. Apply the new size only in `WAITING_FOR_BEGIN` (after uploading the completed frame), then `begin_next`. Mid-effect remapping is out of scope.
 
 Preview uses the **same 18 pt**. Smaller bounds ⇒ fewer cells. Do not shrink the preview font: that would increase cell count.
 
@@ -162,7 +162,7 @@ Metal:
 1. Atlas once per font size: printable ASCII, Braille `U+2800…U+28FF`, block drawing used by conversion. Extra glyphs from effects rasterize lazily up to the atlas cap; beyond that, draw background only.
 2. Each presented frame: walk cells. If `has_background`, instance a bg quad. If `has_glyph` and the glyph has coverage, instance a fg quad. Unoccupied cells are skipped (`frame.clear_*` shows). Do not interpret `reverse` — it is already resolved. Do not read `flags` (always 0).
 3. Clear color = `frame.clear_*` (the published frame’s background). Not `selected_next.background`, and not a hardcoded `#000000` once settings can change it.
-4. Triple-buffered instance storage. Upload or copy **immediately after** `step` returns, **before** `resize` or `begin_next`.
+4. Triple-buffered instance storage. Upload or copy **immediately after** `step` returns, **before** a waiting `resize` or `begin_next`. A `RUNNING` `resize` does not invalidate the pointer.
 
 Display link: `NSView.displayLink(target:selector:)` added to the **main** run loop (`.common`). Appex `SSENeedsAnimationTimer = false`. Create the session on the main thread when the view has a window (`viewDidMoveToWindow`, `startAnimation`). Stop on the main thread in this order: `omacy_session_destroy`, then invalidate the link, then drop Metal. Triggers: `stopAnimation`, nil window, `com.apple.screensaver.willstop`. `deinit` asserts if the session is still alive and only then attempts destroy — it is not the primary path. Preferred frame rate: fullscreen max (60–120), Settings preview 30 Hz.
 
@@ -202,7 +202,7 @@ MVP distribution is a **signed, notarized DMG**. The user drags `Omacy.app` into
 - **Update:** user replaces the app via a new DMG drop. Host re-registers on next launch. No Sparkle / no self-update in MVP.
 - **Uninstall:** host unregisters (`pluginkit -r`) and shows instructions to Trash the app and optionally delete the App Group. No self-delete.
 - **Signing:** ad-hoc for local canary; Developer ID + notarize on the DMG before any other machine.
-- **Failure:** last-known-good `settings.json` + `screensaver.txt` (write temp, `rename`). Invalid files fall back to bundled defaults and surface an error in the host. A dead session is `destroy`ed on the main thread and recreated there with last-known-good content and the current `resize`.
+- **Failure:** last-known-good `settings.json` + `screensaver.txt` (write temp, `rename`). Invalid files keep last-known-good and surface an error in the host. Bundled defaults only when no last-known-good exists. A dead session is `destroy`ed on the main thread and recreated there with last-known-good content and the current (or pending) geometry.
 
 ## Settings
 
@@ -234,7 +234,7 @@ No `exclude`, no `cols`/`rows`. `effect` is `"random"` or a `ttfx` name.
 | `fontSize` | Swift / `OmacyRenderer` only | Never sent to the engine. Drives cell metrics → `resize` |
 | `asciiMode`, `threshold`, `invert` | Host config UI only | Conversion time, not the live session |
 
-The session is created on the main thread with `OmacySessionConfig` plus initial `cols`/`rows`. `config_dir` is create-only; pending config cannot change the reload directory. At an effect end, `step` caches the last frame, then applies pending content or rereads engine keys from disk into `selected_next` (see [ffi.md](ffi.md)) and waits. Swift uploads that frame, reads `fontSize` (from its own copy of settings), recomputes the grid, `resize`s if needed, then `begin_next`. A newly selected background is not the presented clear until `begin_next` succeeds. Failed disk reads keep last-known-good **content**; geometry is untouched. No dispatch source, no `NSFileCoordinator` watcher.
+The session is created on the main thread with `OmacySessionConfig` plus initial `cols`/`rows`. `config_dir` is create-only; pending config cannot change the reload directory. At an effect end, `step` caches the last frame, then applies pending content or rereads engine keys from disk into `selected_next` (see [ffi.md](ffi.md)) and waits. It does not apply `pending_geometry` (that would invalidate the frame before upload). Swift uploads that frame, reads `fontSize` (from its own copy of settings), recomputes the grid, `resize`s if needed, then `begin_next`. A newly selected background is not the presented clear until `begin_next` succeeds. Failed disk reads keep last-known-good **content**; bundled defaults only if none exists. Geometry is untouched by content reload. No dispatch source, no `NSFileCoordinator` watcher.
 
 Image import, threshold, invert, mode, and paste-from-text run in the host app. Saving writes the App Group and, if a preview session exists, `set_pending_config` on the main thread. The System Settings sheet, when added, can change `effect` and restore default art only.
 
@@ -284,7 +284,7 @@ Multi-display: independent sessions, independent random picks, shared App Group 
 | `fill_grid` | Vs ANSI oracle; asymmetric origin fixture; reverse × four occupancies |
 | Engine | [parity.md](parity.md) matrix, all 37 effects |
 | ASCII | Identity vs committed fixtures |
-| FFI | Null `out` on `step`, panic invalidates `cells`, wait-state republish, upload-before-`resize`/`begin_next`, `clear_*` vs `selected_next.background`, `error_message(NULL)` any thread |
+| FFI | Null `out` on `step`, panic invalidates `cells`, `RUNNING` `resize` does not, waiting `resize` applies `pending_geometry`, `clear_*` vs `selected_next.background`, `error_message(NULL)` any thread |
 | Host | Preview still runs if the appex is uninstalled |
 
 Rust tests run on CI without a Mac. Canary and saver idle tests are local until a macOS runner exists.
@@ -297,7 +297,7 @@ About screen: “Effects by Terminal Text Effects (ChrisBuilds), Rust engine `tt
 
 ## Delivery phases
 
-0. **This spec** (revision 6).
+0. **This spec** (revision 7).
 1. **Appex canary.** Signed host+appex, fixed asymmetric grid, install/enable/idle/uninstall. **Go/no-go.**
 2. **Engine in the host.** Vendored `ttfx`, 60 Hz `step`, Metal renderer, default wordmark, random effects, parity matrix. **Worst-case gate:** all 37 effects, maximum grid (32_768 cells), at least three simultaneous sessions. Main-thread `step` + upload + encode must stay under 8.3 ms (one 120 Hz frame). Miss the budget: lower the presentation cap or the cell cap; do not ship a 120 Hz link that misses.
 3. **Engine in the canary.** Same renderer as the host, still no image UI.
@@ -313,8 +313,9 @@ About screen: “Effects by Terminal Text Effects (ChrisBuilds), Rust engine `tt
 | Colored blanks / reverse | Occupancy flags; reverse resolved in `fill_grid`; four-combo fixtures |
 | Vertical flip | ABI origin + asymmetric golden |
 | FFI races / panics | Main-thread ownership, `catch_unwind`, `panic = "unwind"`, no retained pointers |
-| Stale geometry on config | `resize` only; pending config has no dimensions |
-| Font vs next effect | Upload completed frame, then `resize` / `begin_next` |
+| Stale geometry on config | Content packets have no dimensions |
+| Mid-effect resize | `pending_geometry`; apply in wait; margins absorb the gap |
+| Font vs next effect | Upload completed frame, then waiting `resize` / `begin_next` |
 | Clear color at boundary | Cached `clear_*` stays old; `selected_next.background` promotes on `begin_next` |
 | `step` during wait | Republish cached frame; pending queued in wait is for the next boundary |
 | 120 Hz main-thread budget | Phase 2 gate: < 8.3 ms, max grid, ≥3 sessions |
@@ -325,4 +326,4 @@ About screen: “Effects by Terminal Text Effects (ChrisBuilds), Rust engine `tt
 
 ## Out of scope until someone asks
 
-Per-effect knobs. Exclude lists. Multiple saved logos. Color themes beyond the engine. Intel/universal. `.saver` fallback. `CAMetalDisplayLink`. Self-update. Off-main sessions (if ever: immutable snapshots produced on main — never `Send` the session).
+Per-effect knobs. Exclude lists. Multiple saved logos. Color themes beyond the engine. Intel/universal. `.saver` fallback. `CAMetalDisplayLink`. Self-update. Off-main sessions (if ever: immutable snapshots produced on main — never `Send` the session). Mid-effect canvas remapping / restart-on-resize.
