@@ -6,7 +6,7 @@ Host sources now include last-known-good App Group writes, stop-before-start lif
 
 | Check | Status here |
 |---|---|
-| Host + appex compile (Xcode, ad-hoc) | `macos-26` resolves PaperSaver; failed on duplicate `libomacy_engine.a` from two “Build Rust engine” phases. Script now only on the appex (host depends on it). Result pending |
+| Host + appex compile (Xcode, ad-hoc) | `macos-26` + PaperSaver + cargo got to Swift. Failed on `displayLink` (non-optional) and `Int(omacy_status)`. Fix pending this run |
 | Install: DMG → `/Applications` or Xcode DerivedData | Unverified |
 | Discover: listed with first-party savers in System Settings | Unverified |
 | Thumbnail 107×65 / 214×130 | Landscape canary fixture PNGs present; System Settings listing unverified |

@@ -83,7 +83,7 @@ final class OmacyRenderer: NSObject {
         guard let view, session != nil else { return }
         stopped = false
         displayLink?.invalidate()
-        guard let link = view.displayLink(target: self, selector: #selector(tick(_:))) else { return }
+        let link = view.displayLink(target: self, selector: #selector(tick(_:)))
         link.add(to: .main, forMode: .common)
         if isPreview {
             link.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 30, preferred: 30)
@@ -354,7 +354,7 @@ final class OmacyRenderer: NSObject {
             session = out
             return true
         }
-        log.error("session create failed: \(Int(status), privacy: .public)")
+        log.error("session create failed: \(String(describing: status), privacy: .public)")
         return false
     }
 
