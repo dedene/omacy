@@ -66,3 +66,22 @@ fn oversized_svg_is_limit() {
         other => panic!("expected limit, got {other:?}"),
     }
 }
+
+#[test]
+fn svg_file_href_is_ignored() {
+    let svg = br#"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+  <rect width="16" height="16" fill="black"/>
+  <image href="file:///etc/passwd" width="16" height="16"/>
+</svg>"#;
+    let cfg = OmacyAsciiConfig {
+        mode: OMACY_ASCII_BLOCK,
+        width: 8,
+        height: 4,
+        threshold: 50,
+        invert: 0,
+        trim: 1,
+        _pad: 0,
+    };
+    let text = ascii_from_bytes(cfg, svg).expect("svg with file href must not load the file");
+    assert!(!text.is_empty());
+}

@@ -75,6 +75,10 @@ fn decode_svg(bytes: &[u8]) -> Result<RgbaImage, EngineError> {
     }
     let mut options = usvg::Options {
         resources_dir: None,
+        image_href_resolver: usvg::ImageHrefResolver {
+            resolve_data: Box::new(|_, _, _| None),
+            resolve_string: Box::new(|_, _| None),
+        },
         ..usvg::Options::default()
     };
     options.fontdb_mut().set_serif_family("");

@@ -48,6 +48,7 @@
 		1A0000B5000000000000000A /* libomacy_engine.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A00009B000000000000000B /* libomacy_engine.a */; };
 		1A0000B6000000000000000A /* OmacyCanaryAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00009D000000000000000B /* OmacyCanaryAnimator.swift */; };
 		1A0000B7000000000000000A /* OmacyCanaryAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00009D000000000000000B /* OmacyCanaryAnimator.swift */; };
+		1A0000E0000000000000000A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000E0000000000000000B /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -111,6 +112,7 @@
 		1A00009B000000000000000B /* libomacy_engine.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libomacy_engine.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A00009C000000000000000B /* Omacy-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Omacy-Bridging-Header.h"; sourceTree = "<group>"; };
 		1A00009D000000000000000B /* OmacyCanaryAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyCanaryAnimator.swift; sourceTree = "<group>"; };
+		1A0000E0000000000000000B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -161,6 +163,7 @@
 				1A000062000000000000000B /* PreviewView.swift */,
 				1A000063000000000000000B /* PreviewViewRepresentable.swift */,
 				1A00009C000000000000000B /* Omacy-Bridging-Header.h */,
+				1A0000E0000000000000000B /* Assets.xcassets */,
 				1A00000A000000000000000B /* Info.plist */,
 				1A00000B000000000000000B /* Omacy.entitlements */,
 			);
@@ -327,6 +330,7 @@
 				1A0000AC000000000000000A /* FairfaxHD.ttf in Resources */,
 				1A0000AE000000000000000A /* screensaver.txt in Resources */,
 				1A0000B0000000000000000A /* OFL.txt in Resources */,
+				1A0000E0000000000000000A /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

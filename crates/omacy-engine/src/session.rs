@@ -135,6 +135,13 @@ impl Session {
         matches!(self.state, LiveState::Waiting)
     }
 
+    pub fn force_reentrant_step(&mut self) -> Result<(OmacyFrame, bool), EngineError> {
+        self.stepping = true;
+        let result = self.step(1.0 / 60.0);
+        self.stepping = false;
+        result
+    }
+
     pub fn mark_dead(&mut self, message: String) {
         self.state = LiveState::Dead;
         self.last_error = message;

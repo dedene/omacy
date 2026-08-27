@@ -8,7 +8,7 @@ Host sources now include last-known-good App Group writes, stop-before-start lif
 |---|---|
 | Install: DMG → `/Applications` or Xcode DerivedData | Unverified |
 | Discover: listed with first-party savers in System Settings | Unverified |
-| Thumbnail 107×65 / 214×130 | Assets present; System Settings listing unverified |
+| Thumbnail 107×65 / 214×130 | Landscape canary fixture PNGs present; System Settings listing unverified |
 | Enable via PaperSaver `setScreensaverEverywhere` and Settings | Sources present; unverified |
 | Idle activation on macOS 26 | Unverified |
 | Multi-display paints the fixture / engine | Unverified |

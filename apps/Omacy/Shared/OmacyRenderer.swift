@@ -406,10 +406,16 @@ final class OmacyRenderer {
         }
         self.device = device
         queue = device.makeCommandQueue()
+        let scale = view.window?.backingScaleFactor ?? view.layer?.contentsScale ?? 2
         let layer = CAMetalLayer()
         layer.device = device
         layer.pixelFormat = .bgra8Unorm
         layer.framebufferOnly = true
+        layer.contentsScale = scale
+        layer.drawableSize = CGSize(
+            width: max(view.bounds.width * scale, 1),
+            height: max(view.bounds.height * scale, 1)
+        )
         view.layer = layer
         metalLayer = layer
         pipeline = makePipeline(device: device)

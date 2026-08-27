@@ -209,3 +209,112 @@ fn mark_dead_clears_published_cells() {
     let frame = s.published_c_frame();
     assert!(frame.cells.is_null());
 }
+
+fn wait_for_end(s: &mut Session) {
+    for _ in 0..20_000 {
+        let (_, waiting) = s.step(1.0 / 60.0).unwrap();
+        if waiting {
+            return;
+        }
+    }
+    panic!("effect did not complete");
+}
+
+#[test]
+fn pending_queued_while_waiting_applies_at_following_boundary() {
+    let mut s = session("wipe", 20, 8);
+    wait_for_end(&mut s);
+    s.set_pending(omacy_engine::session::ContentPacket {
+        art: None,
+        effect: "beams".into(),
+        bg: [255, 0, 0, 255],
+    })
+    .unwrap();
+    s.begin_next().unwrap();
+    let (frame, waiting) = s.step(1.0 / 60.0).unwrap();
+    assert!(!waiting);
+    assert_eq!(
+        [frame.clear_r, frame.clear_g, frame.clear_b, frame.clear_a],
+        [0, 0, 0, 255],
+        "packet queued in wait must not promote until the next boundary"
+    );
+    wait_for_end(&mut s);
+    s.begin_next().unwrap();
+    let (frame, waiting) = s.step(1.0 / 60.0).unwrap();
+    assert!(!waiting);
+    assert_eq!(
+        [frame.clear_r, frame.clear_g, frame.clear_b, frame.clear_a],
+        [255, 0, 0, 255]
+    );
+}
+
+#[test]
+fn begin_next_consumes_running_pending_geometry() {
+    let mut s = session("wipe", 20, 8);
+    s.resize(30, 12).unwrap();
+    let (frame, _) = s.step(1.0 / 60.0).unwrap();
+    assert_eq!(frame.cols, 20);
+    assert_eq!(frame.rows, 8);
+    wait_for_end(&mut s);
+    let (frame, waiting) = s.step(1.0 / 60.0).unwrap();
+    assert!(waiting);
+    assert_eq!(frame.cols, 20);
+    assert_eq!(frame.rows, 8);
+    s.begin_next().unwrap();
+    let (frame, waiting) = s.step(1.0 / 60.0).unwrap();
+    assert!(!waiting);
+    assert_eq!(frame.cols, 30);
+    assert_eq!(frame.rows, 12);
+}
+
+#[test]
+fn reentrant_step_is_invalid() {
+    let mut s = session("wipe", 20, 8);
+    match s.force_reentrant_step() {
+        Err(EngineError::InvalidArg(_)) => {}
+        other => panic!("expected invalid arg, got {other:?}"),
+    }
+    s.step(1.0 / 60.0).expect("session still live after re-entrant reject");
+}
+
+#[test]
+fn esc_in_art_is_invalid() {
+    let err = match Session::create(
+        "\u{1b}[31mX".into(),
+        "wipe".into(),
+        [0, 0, 0, 255],
+        None,
+        Some(1),
+        20,
+        8,
+        ClockKind::Virtual60,
+    ) {
+        Err(e) => e,
+        Ok(_) => panic!("expected error"),
+    };
+    assert!(matches!(err, EngineError::InvalidArg(_)));
+}
+
+#[test]
+fn ascii_line_cap() {
+    let art = (0..129).map(|_| "X").collect::<Vec<_>>().join("\n");
+    let err = match Session::create(
+        art,
+        "wipe".into(),
+        [0, 0, 0, 255],
+        None,
+        Some(1),
+        20,
+        8,
+        ClockKind::Virtual60,
+    ) {
+        Err(e) => e,
+        Ok(_) => panic!("expected error"),
+    };
+    assert!(matches!(err, EngineError::Limit(_)));
+}
+
+#[test]
+fn effect_pool_is_thirty_seven() {
+    assert_eq!(ttfx::effects::EffectCommand::NAMES.len(), 37);
+}
