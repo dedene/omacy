@@ -20,12 +20,18 @@ class PluginManager: ObservableObject {
     @Published var installedPath: String?
     @Published var isLoading: Bool = false
     @Published var lastError: String?
+    @Published var registeredPaths: [String] = []
 
     /// Registered with PlugInKit but the appex file is gone.
     var isPluginMissing: Bool {
         guard isInstalled else { return false }
         guard let path = installedPath, !path.isEmpty else { return true }
         return !FileManager.default.fileExists(atPath: path)
+    }
+
+    /// PlugInKit is sticky if DerivedData and /Applications are both registered.
+    var hasConflictingRegistrations: Bool {
+        registeredPaths.count > 1
     }
 
     @Published var isActiveScreensaver: Bool = false
@@ -63,18 +69,23 @@ class PluginManager: ObservableObject {
 
         Task {
             do {
-                let (isRegistered, path, version) = try await queryPluginKit()
+                let matches = try await queryPluginKit()
                 await MainActor.run {
-                    self.isInstalled = isRegistered
-                    self.installedPath = path
-                    self.installedVersion = version
+                    self.registeredPaths = matches.map(\.path).compactMap { $0 }
+                    self.isInstalled = !matches.isEmpty
+                    self.installedPath = matches.first?.path
+                    self.installedVersion = matches.first?.version
                     self.isLoading = false
+                    if matches.count > 1 {
+                        self.lastError = "Registered in more than one place. Unregister extras so only /Applications or DerivedData remains."
+                    }
                 }
             } catch {
                 await MainActor.run {
                     self.isInstalled = false
                     self.installedPath = nil
                     self.installedVersion = nil
+                    self.registeredPaths = []
                     self.isLoading = false
                     self.lastError = error.localizedDescription
                 }
@@ -82,12 +93,18 @@ class PluginManager: ObservableObject {
         }
     }
 
+    private struct PluginMatch {
+        var path: String?
+        var version: String?
+    }
+
     /// Query pluginkit for our extension's registration status.
     /// Line format we look for:
     ///   `+    be.zenjoy.omacy.screensaver(1.0) <path>`
-    private func queryPluginKit() async throws -> (Bool, String?, String?) {
+    private func queryPluginKit() async throws -> [PluginMatch] {
         let output = try runProcess("/usr/bin/pluginkit", arguments: ["-m", "-v", "-p", "com.apple.screensaver"])
 
+        var matches: [PluginMatch] = []
         let lines = output.components(separatedBy: "\n")
         for line in lines {
             if line.contains(bundleIdentifier) {
@@ -105,11 +122,11 @@ class PluginManager: ObservableObject {
                     path = String(line[pathStart.lowerBound...])
                 }
 
-                return (true, path, version)
+                matches.append(PluginMatch(path: path, version: version))
             }
         }
 
-        return (false, nil, nil)
+        return matches
     }
 
     /// Install the embedded extension by handing it to pluginkit.
@@ -143,26 +160,28 @@ class PluginManager: ObservableObject {
         }
     }
 
-    /// Uninstall the extension.
+    /// Uninstall every registered copy, then the embedded path as a fallback.
     func uninstall() throws {
-        let extensionPath: String
-        if let installed = installedPath, !installed.isEmpty {
-            extensionPath = installed
-        } else if let embedded = embeddedExtensionPath {
-            extensionPath = embedded
-        } else {
-            throw PluginError.extensionPathNotFound
+        var paths = registeredPaths
+        if paths.isEmpty {
+            if let installed = installedPath, !installed.isEmpty {
+                paths = [installed]
+            } else if let embedded = embeddedExtensionPath {
+                paths = [embedded]
+            } else {
+                throw PluginError.extensionPathNotFound
+            }
         }
-
-        logger.info("Uninstalling extension at: \(extensionPath, privacy: .public)")
 
         isLoading = true
         lastError = nil
 
         do {
-            _ = try runProcess("/usr/bin/pluginkit", arguments: ["-r", extensionPath])
+            for extensionPath in paths {
+                logger.info("Uninstalling extension at: \(extensionPath, privacy: .public)")
+                _ = try runProcess("/usr/bin/pluginkit", arguments: ["-r", extensionPath])
+            }
             logger.info("Extension uninstalled successfully")
-
             checkInstallationStatus()
         } catch {
             isLoading = false

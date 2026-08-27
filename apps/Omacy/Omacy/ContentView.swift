@@ -144,6 +144,18 @@ struct ContentView: View {
                         }
                         .font(.caption)
                     }
+                    if pluginManager.hasConflictingRegistrations {
+                        Text("Registered in more than one place. Unregister extras so only /Applications or DerivedData remains.")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        ForEach(pluginManager.registeredPaths, id: \.self) { path in
+                            Text(path)
+                                .font(.caption2)
+                                .lineLimit(2)
+                                .truncationMode(.middle)
+                                .textSelection(.enabled)
+                        }
+                    }
                 } else {
                     Text("Omacy is not in System Settings yet. Register the extension from this app — the preview still runs either way.")
                         .font(.caption)

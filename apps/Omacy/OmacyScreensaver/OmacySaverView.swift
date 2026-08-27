@@ -64,7 +64,8 @@ final class OmacySaverView: ScreenSaverView {
 
     private func start() {
         teardown()
-        switch renderer.attach(to: self, isPreview: isPreview) {
+        let preview = isPreview || (bounds.width > 0 && bounds.width < 400)
+        switch renderer.attach(to: self, isPreview: preview) {
         case .engine:
             usingCanary = false
             renderer.start()
