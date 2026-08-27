@@ -404,7 +404,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "find \"$CODESIGNING_FOLDER_PATH\" -name '*.appex' -exec pluginkit -a {} \\;\n";
+			shellScript = "if [ -n \"$CI\" ]; then echo \"skip pluginkit on CI\"; exit 0; fi\nfind \"$CODESIGNING_FOLDER_PATH\" -name '*.appex' -exec pluginkit -a {} \\; || true\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -603,6 +603,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
+					"$(SRCROOT)/OmacyScreensaver",
 					"$(SRCROOT)/../../crates/omacy-engine/include",
 				);
 				LIBRARY_SEARCH_PATHS = (
@@ -650,6 +651,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
+					"$(SRCROOT)/OmacyScreensaver",
 					"$(SRCROOT)/../../crates/omacy-engine/include",
 				);
 				LIBRARY_SEARCH_PATHS = (
@@ -706,6 +708,7 @@
 				SKIP_INSTALL = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
+					"$(SRCROOT)/OmacyScreensaver",
 					"$(SRCROOT)/../../crates/omacy-engine/include",
 				);
 				LIBRARY_SEARCH_PATHS = (
@@ -762,6 +765,7 @@
 				SKIP_INSTALL = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
+					"$(SRCROOT)/OmacyScreensaver",
 					"$(SRCROOT)/../../crates/omacy-engine/include",
 				);
 				LIBRARY_SEARCH_PATHS = (

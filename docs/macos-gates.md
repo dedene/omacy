@@ -1,11 +1,12 @@
 # macOS canary and idle gates
 
-This Linux environment cannot compile Swift, sign an appex, or run ScreenSaverEngine. The engine is proven here with `cargo test`. The following architecture acceptance table remains a **Mac gate** and is not claimed by this change.
+This Linux environment cannot compile Swift, sign an appex, or run ScreenSaverEngine. The engine is proven here with `cargo test`. GitHub Actions `macos.yml` compiles the host `.app` and screensaver `.appex` (unsigned/ad-hoc). The following architecture acceptance table remains a **Mac gate** and is not claimed by this change.
 
 Host sources now include last-known-good App Group writes, stop-before-start lifecycle, Metal→CALayer canary fallback, occupancy constants, atlas white-pixel UVs, dead-session recreate, pending-config on save, uninstall “move Omacy to Trash” copy, About credit, and missing/unelected appex recovery. Those still need a Mac to execute.
 
 | Check | Status here |
 |---|---|
+| Host + appex compile (Xcode, ad-hoc) | Workflow added (`macos.yml` on `macos-15`); first run unverified |
 | Install: DMG → `/Applications` or Xcode DerivedData | Unverified |
 | Discover: listed with first-party savers in System Settings | Unverified |
 | Thumbnail 107×65 / 214×130 | Landscape canary fixture PNGs present; System Settings listing unverified |

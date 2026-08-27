@@ -1,0 +1,29 @@
+name: macos
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  host:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.88.0
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - name: Build host app and screensaver appex
+        working-directory: apps/Omacy
+        run: |
+          xcodebuild \
+            -project Omacy.xcodeproj \
+            -scheme Omacy \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -skipMacroValidation \
+            CODE_SIGN_IDENTITY="-" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            DEVELOPMENT_TEAM="" \
+            build

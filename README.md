@@ -20,6 +20,8 @@ Pins: `vendor/ttfx/PIN` is ttfx v0.3.2 (`7203e354498462064b7c0a89375051f65cf2ce9
 
 Open `apps/Omacy/Omacy.xcodeproj` on macOS 15+. The Xcode build phase runs `apps/Omacy/scripts/build-engine.sh`, which builds `libomacy_engine.a` for `aarch64-apple-darwin` and links it into the app and the appex.
 
+CI compiles that same scheme on `macos-15` (unsigned/ad-hoc). Idle / System Settings listing remains a machine gate: [docs/macos-gates.md](docs/macos-gates.md).
+
 Put `Omacy.app` in `/Applications`, then use the host to register the extension (`pluginkit`) and enable it (PaperSaver). The host will not register from a random path.
 
 Configuration (paste art, PNG/SVG conversion, effect, restore default) lives in the host and writes App Group `group.be.zenjoy.omacy`.

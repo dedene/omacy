@@ -7,3 +7,4 @@ ts	phase	decision	why	evidence	result
 2026-08-27T16:46:50Z	impl	close remaining architecture gaps	atomic store, lifecycle, occupancy/atlas, dead recover, copy, panic+budget tests	docs/architecture.md testing table + host/appex sources	in-progress
 2026-08-27T17:01:46Z	impl	canary thumbnails, SVG href reject, session contract tests	architecture thumbnail + FFI wait/pending/re-entrant + no file SVG	cargo test -p omacy-engine	pass
 2026-08-27T17:06:12Z	impl	appex per-display loadView + duplicate pluginkit warning	Settings preview 30Hz and multi-display need the real frame; PlugInKit sticky if two locations	apps/Omacy/OmacyScreensaver/OmacySaverViewController.swift PluginManager.swift	in-progress
+2026-08-27T17:15:04Z	ci	add macos-15 xcodebuild of host+appex	Linux cannot compile Swift; a GitHub Mac runner can prove the Aerial-path targets link	.github/workflows/macos.yml	in-progress
