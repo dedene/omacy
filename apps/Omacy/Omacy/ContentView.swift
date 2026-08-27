@@ -278,9 +278,12 @@ struct ContentView: View {
     }
 
     private func openScreenSaverSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.ScreenSaver-Settings.extension") {
-            NSWorkspace.shared.open(url)
+        // Tahoe keeps Screen Saver as a sheet on Wallpaper. The old
+        // ScreenSaver-Settings.extension URL no longer opens that pane.
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.Wallpaper-Settings.extension?ScreenSaver") else {
+            return
         }
+        NSWorkspace.shared.open(url)
     }
 }
 
