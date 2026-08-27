@@ -113,7 +113,8 @@ platform :mac do
       output_directory: BUILD_DIR,
       output_name: APP_NAME,
       export_method: "developer-id",
-      export_options: "fastlane/ExportOptions.plist"
+      export_options: "fastlane/ExportOptions.plist",
+      xcargs: "ARCHS=arm64 ONLY_ACTIVE_ARCH=YES EXCLUDED_ARCHS=x86_64"
     )
   end
 
