@@ -1,9 +1,10 @@
 import AppKit
+import ScreenSaver
 
 private let logger = AppexLog.logger("Configuration")
 
 @objc(OmacyConfigurationViewController)
-class OmacyConfigurationViewController: NSViewController {
+class OmacyConfigurationViewController: ScreenSaverConfigurationViewController {
     private let effectField = NSTextField()
     private let statusLabel = NSTextField(labelWithString: "")
 

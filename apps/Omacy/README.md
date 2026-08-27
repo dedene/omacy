@@ -2,7 +2,7 @@
 
 Xcode project for the host app and `com.apple.screensaver` appex.
 
-Build on macOS 15+ with Xcode 16+. The “Build Rust engine” phase runs `scripts/build-engine.sh` and links `libomacy_engine.a` into both targets.
+Build on macOS 15+ (deployment target 15.0). PaperSaver 0.2.0 needs Swift 6.2, so resolving packages wants Xcode 26. The “Build Rust engine” phase runs `scripts/build-engine.sh` and links `libomacy_engine.a` into both targets.
 
 ## Run
 

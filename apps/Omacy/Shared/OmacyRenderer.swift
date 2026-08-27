@@ -20,8 +20,12 @@ enum OmacyAttachMode {
 }
 
 @MainActor
-final class OmacyRenderer {
+final class OmacyRenderer: NSObject {
     var onEngineUnavailable: (() -> Void)?
+
+    override init() {
+        super.init()
+    }
 
     private weak var view: NSView?
     private var session: OpaquePointer?
