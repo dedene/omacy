@@ -59,4 +59,15 @@ enum OmacyLayout {
         }
         return viewSize
     }
+
+    static func drawableSize(viewSize: CGSize, scale: CGFloat) -> CGSize {
+        CGSize(
+            width: max((viewSize.width * scale).rounded(), 1),
+            height: max((viewSize.height * scale).rounded(), 1)
+        )
+    }
+
+    static func drawableSizeChanged(current: CGSize, proposed: CGSize) -> Bool {
+        abs(current.width - proposed.width) >= 1 || abs(current.height - proposed.height) >= 1
+    }
 }

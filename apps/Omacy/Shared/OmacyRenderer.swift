@@ -119,21 +119,25 @@ final class OmacyRenderer: NSObject {
     }
 
     func updateGeometry() {
-        guard let view else { return }
+        guard let view, view.bounds.width > 1, view.bounds.height > 1 else { return }
         let font = OmacyFont.makeFont(size: fontSize)
         let layout = OmacyLayout.grid(view: view, font: font)
-        let scale = view.window?.backingScaleFactor ?? view.layer?.contentsScale ?? 2
-        metalLayer?.drawableSize = CGSize(
-            width: view.bounds.width * scale,
-            height: view.bounds.height * scale
-        )
+        let scale = view.window?.backingScaleFactor ?? metalLayer?.contentsScale ?? view.layer?.contentsScale ?? 2
+        let size = OmacyLayout.drawableSize(viewSize: view.bounds.size, scale: scale)
+        if metalLayer?.contentsScale != scale {
+            metalLayer?.contentsScale = scale
+        }
+        if let metalLayer, OmacyLayout.drawableSizeChanged(current: metalLayer.drawableSize, proposed: size) {
+            metalLayer.drawableSize = size
+        }
+        metalLayer?.frame = view.bounds
         if layout.cols != cols || layout.rows != rows {
             pendingCols = layout.cols
             pendingRows = layout.rows
             debounce = CACurrentMediaTime()
         }
-        if let device {
-            atlas.rebuild(device: device, font: font, cell: layout.cell)
+        if let device, atlas.needsRebuild(font: font, cell: layout.cell, scale: scale) {
+            atlas.rebuild(device: device, font: font, cell: layout.cell, scale: scale)
         }
     }
 
@@ -213,7 +217,7 @@ final class OmacyRenderer: NSObject {
     }
 
     private func present(frame: OmacyFrame, cells: [OmacyCell]) {
-        guard let view, let metalLayer, let queue, let pipeline, let drawable = metalLayer.nextDrawable() else { return }
+        guard let view, let metalLayer, let queue, let pipeline else { return }
         let font = OmacyFont.makeFont(size: fontSize)
         let layout = OmacyLayout.grid(view: view, font: font)
         var instances: [QuadInstance] = []
@@ -260,56 +264,62 @@ final class OmacyRenderer: NSObject {
                 }
             }
         }
-        let clear = MTLClearColor(
+        var upload: (index: Int, buffer: MTLBuffer)?
+        if !instances.isEmpty {
+            guard let chosen = freeInstanceBufferIndex(), let device else { return }
+            let bytes = instances.count * MemoryLayout<QuadInstance>.stride
+            if instanceBuffers[chosen] == nil || instanceBuffers[chosen]!.length < bytes {
+                instanceBuffers[chosen] = device.makeBuffer(length: max(bytes, 4096), options: .storageModeShared)
+            }
+            guard let buffer = instanceBuffers[chosen] else { return }
+            instances.withUnsafeBytes { raw in
+                buffer.contents().copyMemory(from: raw.baseAddress!, byteCount: bytes)
+            }
+            upload = (chosen, buffer)
+        }
+
+        guard let drawable = metalLayer.nextDrawable(),
+              let cmd = queue.makeCommandBuffer() else { return }
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = drawable.texture
+        pass.colorAttachments[0].loadAction = .clear
+        pass.colorAttachments[0].clearColor = MTLClearColor(
             red: Double(frame.clear_r) / 255,
             green: Double(frame.clear_g) / 255,
             blue: Double(frame.clear_b) / 255,
             alpha: Double(max(frame.clear_a, 255)) / 255
         )
-        guard let cmd = queue.makeCommandBuffer(),
-              let pass = MTLRenderPassDescriptor() as MTLRenderPassDescriptor? else { return }
-        pass.colorAttachments[0].texture = drawable.texture
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = clear
         pass.colorAttachments[0].storeAction = .store
         guard let enc = cmd.makeRenderCommandEncoder(descriptor: pass) else { return }
         enc.setRenderPipelineState(pipeline)
-        if !instances.isEmpty {
-            var chosen: Int?
-            for offset in 0..<3 {
-                let idx = (bufferIndex + offset) % 3
-                if !bufferBusy[idx] {
-                    chosen = idx
-                    break
-                }
-            }
-            if let chosen, let device {
-                let bytes = instances.count * MemoryLayout<QuadInstance>.stride
-                if instanceBuffers[chosen] == nil || instanceBuffers[chosen]!.length < bytes {
-                    instanceBuffers[chosen] = device.makeBuffer(length: max(bytes, 4096), options: .storageModeShared)
-                }
-                if let buffer = instanceBuffers[chosen] {
-                    instances.withUnsafeBytes { raw in
-                        buffer.contents().copyMemory(from: raw.baseAddress!, byteCount: bytes)
-                    }
-                    bufferBusy[chosen] = true
-                    bufferIndex = (chosen + 1) % 3
-                    enc.setVertexBuffer(buffer, offset: 0, index: 0)
-                    var viewport = SIMD2<Float>(Float(view.bounds.width), Float(view.bounds.height))
-                    enc.setVertexBytes(&viewport, length: MemoryLayout<SIMD2<Float>>.size, index: 1)
-                    enc.setFragmentTexture(atlas.texture, index: 0)
-                    enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: instances.count)
-                    cmd.addCompletedHandler { [weak self] _ in
-                        DispatchQueue.main.async {
-                            self?.bufferBusy[chosen] = false
-                        }
-                    }
+        if let upload {
+            bufferBusy[upload.index] = true
+            bufferIndex = (upload.index + 1) % 3
+            enc.setVertexBuffer(upload.buffer, offset: 0, index: 0)
+            var viewport = SIMD2<Float>(Float(view.bounds.width), Float(view.bounds.height))
+            enc.setVertexBytes(&viewport, length: MemoryLayout<SIMD2<Float>>.size, index: 1)
+            enc.setFragmentTexture(atlas.texture, index: 0)
+            enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: instances.count)
+            let chosen = upload.index
+            cmd.addCompletedHandler { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.bufferBusy[chosen] = false
                 }
             }
         }
         enc.endEncoding()
         cmd.present(drawable)
         cmd.commit()
+    }
+
+    private func freeInstanceBufferIndex() -> Int? {
+        for offset in 0..<3 {
+            let idx = (bufferIndex + offset) % 3
+            if !bufferBusy[idx] {
+                return idx
+            }
+        }
+        return nil
     }
 
     @discardableResult
@@ -411,19 +421,23 @@ final class OmacyRenderer: NSObject {
         self.device = device
         queue = device.makeCommandQueue()
         let scale = view.window?.backingScaleFactor ?? view.layer?.contentsScale ?? 2
+        let container = CALayer()
+        container.backgroundColor = NSColor.black.cgColor
+        container.isOpaque = true
         let layer = CAMetalLayer()
         layer.device = device
         layer.pixelFormat = .bgra8Unorm
         layer.framebufferOnly = true
+        layer.isOpaque = true
         layer.contentsScale = scale
-        layer.drawableSize = CGSize(
-            width: max(view.bounds.width * scale, 1),
-            height: max(view.bounds.height * scale, 1)
-        )
-        view.layer = layer
+        layer.drawableSize = OmacyLayout.drawableSize(viewSize: view.bounds.size, scale: scale)
+        layer.frame = view.bounds
+        layer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+        view.layer = container
+        container.addSublayer(layer)
         metalLayer = layer
         pipeline = makePipeline(device: device)
-        atlas.rebuild(device: device, font: font, cell: cell)
+        atlas.rebuild(device: device, font: font, cell: cell, scale: scale)
         return pipeline != nil
     }
 

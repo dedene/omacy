@@ -12,3 +12,4 @@ ts	phase	decision	why	evidence	result
 2026-08-27T17:49:00Z	ci	one rust build phase (appex)	macos-26 failed: both targets wrote libomacy_engine.a; host already depends on appex	apps/Omacy/Omacy.xcodeproj/project.pbxproj	in-progress
 2026-08-27T18:11:00Z	ci	fix displayLink non-optional + omacy_status log	macos-26 Swift: guard let on CADisplayLink; Int() on C enum	apps/Omacy/Shared/OmacyRenderer.swift	in-progress
 2026-08-27T18:47:00Z	ci	host+appex BUILD SUCCEEDED on Xcode 26.6	deinit no longer calls MainActor stop; PreviewView is a typealias; one -lomacy_engine link	local xcodebuild Release arm64; Omacy.app/Contents/PlugIns/OmacyScreensaver.appex	pass
+2026-08-27T20:10:30Z	impl	stop Metal drawable invalidation on layout	CAMetalLayer was view.layer; layout rewrote drawableSize + rebuilt atlas every pass; busy ring presented cleared frames	preview video 45% black frames; Peter confirmed host preview continuous	pass

@@ -20,6 +20,10 @@ final class OmacyAtlas {
     private var glyphH = 1
     private var cols = 1
     private var nextSlot = 1
+    private var builtCell: CGSize = .zero
+    private var builtScale: CGFloat = 0
+    private var builtFontName = ""
+    private var builtFontSize: CGFloat = 0
 
     private let preload: [UInt32] = {
         var codes: [UInt32] = Array(0x20...0x7E)
@@ -28,12 +32,24 @@ final class OmacyAtlas {
         return codes
     }()
 
-    func rebuild(device: MTLDevice, font: NSFont, cell: CGSize) {
+    func needsRebuild(font: NSFont, cell: CGSize, scale: CGFloat) -> Bool {
+        abs(cell.width - builtCell.width) >= 0.5
+            || abs(cell.height - builtCell.height) >= 0.5
+            || abs(scale - builtScale) >= 0.01
+            || font.fontName != builtFontName
+            || abs(font.pointSize - builtFontSize) >= 0.01
+    }
+
+    func rebuild(device: MTLDevice, font: NSFont, cell: CGSize, scale: CGFloat) {
         self.cell = cell
+        builtCell = cell
+        builtScale = scale
+        builtFontName = font.fontName
+        builtFontSize = font.pointSize
         extraCount = 0
         map.removeAll()
         nextSlot = 1
-        let scale = max(NSScreen.main?.backingScaleFactor ?? 2, 1)
+        let scale = max(scale, 1)
         glyphW = max(Int(ceil(cell.width * scale)), 1)
         glyphH = max(Int(ceil(cell.height * scale)), 1)
         let count = preload.count + extraCap + 1
