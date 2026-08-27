@@ -4,7 +4,7 @@ macOS screensaver that replays Omarchy’s ASCII text-effects loop: a logo (or a
 
 Stack: **patched `ttfx` → C ABI cell grid → Metal renderer → host app + `.appex`.**
 
-Revision 2 of this design. Implementation starts only after this revision is accepted.
+Revision 3 of this design. Implementation starts only after this revision is accepted.
 
 Companion contracts: [ffi.md](ffi.md) (ABI, threading, occupancy, origin) and [parity.md](parity.md) (pins, clock, 37-effect matrix).
 
@@ -14,7 +14,7 @@ When the Mac idles, every connected display runs a `ttfx` effect on a centered A
 
 Configuration lives in the **host app**: paste art, generate art from a PNG/SVG, pick an effect or random, restore the default wordmark. System Settings shows the saver, its thumbnail, and (later) a thin sheet for effect choice — not the image converter. The converter needs `NSOpenPanel`; the appex sandbox did not present that panel.
 
-Fidelity is **measured**, not vibed. Motion is cell-grid identity against pinned `ttfx` for all 37 effects. Image conversion is byte identity against goldens produced by pinned Omarchy `omarchy-transcode-ascii`. Font rasterization is allowed to differ. See [parity.md](parity.md).
+Fidelity is **measured**, not vibed. Motion is cell-grid identity against an **independent ANSI oracle** over pinned `ttfx`, for all 37 effects. Image conversion is identity against **committed fixtures**, not a live ImageMagick replay. Font rasterization is allowed to differ. See [parity.md](parity.md).
 
 ## Non-goals (MVP)
 
@@ -25,7 +25,8 @@ Fidelity is **measured**, not vibed. Motion is cell-grid identity against pinned
 - Python TTE, ImageMagick at runtime, effect exclude-lists, per-effect knobs.
 - Filesystem watchers. Settings reload at session start and at effect boundaries only.
 - A separate `omacy-ascii` crate. Conversion stays an internal engine module until a second consumer exists.
-- A worker-thread renderer. Tick stays on the display-link thread until Instruments says otherwise.
+- A worker-thread renderer. The session never leaves its creating thread.
+- Self-install, in-app updater, or self-delete from `/Applications`.
 
 ## Locked decisions
 
@@ -36,11 +37,14 @@ Fidelity is **measured**, not vibed. Motion is cell-grid identity against pinned
 | Engine | Vendor `ttfx`, patch, don’t rewrite | Byte-identical to TTE v0.15.0; already builds on macOS |
 | Frame contract | C ABI, packed cells, no UniFFI | Zero-copy upload; UniFFI would serialize every cell |
 | Occupancy | Background and glyph are independent flags | A blank glyph can still carry a background |
+| Reverse | Resolved inside `fill_grid` | Glyph-only reverse must emit a background quad |
 | Origin | Top-left, rows increase downward | Terminal-internal order is not the ABI |
 | Simulation | Fixed 60 Hz steps, vsync presents | Speed must not track the display |
+| Threading | Create-thread affinity; `WRONG_THREAD` | ttfx is `Rc` / thread-local; a mutex is not `Send` |
 | Draw path | Metal glyph atlas + instanced quads | Core Text per cell per frame would dominate CPU |
 | Display link | `NSView.displayLink(target:selector:)` | AppKit API; not a UIKit window-scene link |
-| Settings | App Group; reload at start + effect boundary | Host and appex are different processes; no kqueue |
+| Settings | App Group; pending config or disk at boundary | Host and appex are different processes; no kqueue |
+| Install | DMG → drag to `/Applications` | Sandboxed app cannot copy/update/delete itself |
 | Image convert | Internal engine module, host-only UI | One consumer; `NSOpenPanel` is in the app |
 | Effect pool | All 37, no excludes | Matches current Omarchy `omarchy-screensaver` |
 | OS floor | macOS 15; develop on 26 | Appex since Sonoma; Peter is on Tahoe |
@@ -60,7 +64,7 @@ OmacyRenderer
   layout → session.step(elapsed) → Metal upload
        │
        ▼
-libomacy_engine.a   (serialized session, 60 Hz accumulator)
+libomacy_engine.a   (thread-affine session, 60 Hz accumulator)
        ├─ vendored ttfx
        └─ ascii module (PNG/SVG → text; host config only)
 ```
@@ -118,7 +122,7 @@ The accumulator lives **in the engine**, not in Swift:
 
 Small, upstreamable, parity suites stay green.
 
-1. `Terminal::fill_grid` — occupancy + glyph + RGBA from `render_cells`. No SGR. Map ttfx’s terminal row order into ABI top-left (see [ffi.md](ffi.md)).
+1. `Terminal::fill_grid` — occupancy + glyph + RGBA from `render_cells`. Reverse is applied here (final colors + final occupancy). No SGR. Map ttfx’s terminal row order into ABI top-left (see [ffi.md](ffi.md)).
 2. `Effect::advance` — tick without formatting. `next_frame` = `advance` + `get_formatted_output_string`.
 3. GUI construction path: no tty pacing, no SIGWINCH.
 4. `from_name("beams")` with struct defaults; no argv.
@@ -145,7 +149,7 @@ Tahoe may hand backing pixels as the view’s `bounds`. Compare `convertToBackin
 Metal:
 
 1. Atlas once per font size: printable ASCII, Braille `U+2800…U+28FF`, block drawing used by conversion. Extra glyphs from effects rasterize lazily up to the atlas cap; beyond that, draw background only.
-2. Each presented frame: walk cells. If `has_background`, instance a bg quad. If `has_glyph` and the glyph has coverage, instance a fg quad. `SPACE` with a background draws bg only. Unoccupied cells are skipped (clear color shows). Reverse swaps fg/bg.
+2. Each presented frame: walk cells. If `has_background`, instance a bg quad. If `has_glyph` and the glyph has coverage, instance a fg quad. Unoccupied cells are skipped (clear color shows). Do not interpret `reverse` — it is already resolved.
 3. Clear color = session background (`#000000`).
 4. Triple-buffered instance storage. Upload **during** `step`’s return, before any other session call.
 
@@ -165,14 +169,14 @@ Acceptance, all required:
 
 | Check | Pass |
 |---|---|
-| Install | Host copies/registers the app; one location (`/Applications` or DerivedData, never both) |
+| Install | User placed the app (DMG → `/Applications`, or Xcode DerivedData for local canary). Host only registers. Never both locations. |
 | Discover | Listed with first-party savers in System Settings, not only under Other |
 | Thumbnail | Landscape 107×65 / 214×130 |
 | Enable | PaperSaver `setScreensaverEverywhere` and Settings both work |
 | Idle | Activates on idle on the development Mac (macOS 26) |
 | Multi-display | Every connected display paints the fixture |
 | Teardown | `willstop` / window-nil drops Metal; no leak after open/close Settings ten times |
-| Uninstall | `pluginkit -r`, app removed, saver gone from Settings after relaunch |
+| Uninstall | Host unregisters and shows “move Omacy to Trash”; it does not delete the bundle |
 | Recovery | Host reports a missing/unelected appex and offers re-register |
 | Version | Repeat idle + Settings on macOS 15 when a box exists; document if deferred |
 
@@ -180,11 +184,14 @@ Fail the gate: do not spend further effort on engine-in-appex. Keep the host pre
 
 ## Install, update, failure
 
-- **Install:** `/Applications/Omacy.app`. `pluginkit -a` on the embedded appex. Host “Install” button. Ad-hoc sign for local canary; Developer ID + notarize before any other machine.
-- **Enable:** PaperSaver + a Settings instruction. Record which displays were set.
-- **Update:** replace the app in the same path, re-register. PlugInKit sticks to `/Applications` if both copies exist.
-- **Uninstall:** unregister, delete the app. Offer to wipe the App Group.
-- **Failure:** last-known-good `settings.json` + `screensaver.txt` (write temp, `rename`). Invalid files fall back to bundled defaults and surface an error in the host. A dead session (`OMACY_ERR_PANIC`) is destroyed and recreated with last-known-good.
+MVP distribution is a **signed, notarized DMG**. The user drags `Omacy.app` into `/Applications` like any Mac app. The host does not copy, replace, or delete itself.
+
+- **Diagnose:** if the bundle is not under `/Applications` (and not a documented DerivedData canary), the host explains drag-to-Applications and refuses PlugInKit registration from a random path.
+- **Register / enable:** from `/Applications`, `pluginkit -a` on the embedded appex; PaperSaver enable; Settings instruction. One location per machine — mixing DerivedData and `/Applications` makes PlugInKit sticky.
+- **Update:** user replaces the app via a new DMG drop. Host re-registers on next launch. No Sparkle / no self-update in MVP.
+- **Uninstall:** host unregisters (`pluginkit -r`) and shows instructions to Trash the app and optionally delete the App Group. No self-delete.
+- **Signing:** ad-hoc for local canary; Developer ID + notarize on the DMG before any other machine.
+- **Failure:** last-known-good `settings.json` + `screensaver.txt` (write temp, `rename`). Invalid files fall back to bundled defaults and surface an error in the host. A dead session is `destroy`ed on the display-link thread and recreated there with last-known-good.
 
 ## Settings
 
@@ -208,15 +215,15 @@ settings.json
 
 No `exclude` key in MVP. `effect` is `"random"` or a `ttfx` name.
 
-The session is created with a config directory path. It reads and validates those files at **create** and when an effect completes, before starting the next. Failed reads keep the in-memory last-known-good. No dispatch source, no `NSFileCoordinator` watcher.
+The session is created on the display-link thread with a deep-copied `OmacyConfig`. At effect boundaries it applies `set_next_config` if pending, otherwise rereads the App Group directory (see [ffi.md](ffi.md)). Failed reads keep last-known-good. No dispatch source, no `NSFileCoordinator` watcher.
 
-Image import, threshold, invert, mode, and paste-from-text run in the host app. Saving writes the App Group and, if a preview session exists, `set_next_config` / recreate. The System Settings sheet, when added, can change `effect` and restore default art only.
+Image import, threshold, invert, mode, and paste-from-text run in the host app. Saving writes the App Group and, if a preview session exists, dispatches `set_next_config` onto that session’s thread. The System Settings sheet, when added, can change `effect` and restore default art only.
 
 ## Image → ASCII
 
 Internal module of `omacy-engine`. Host config UI calls it through the FFI text allocators in [ffi.md](ffi.md). The appex never sees image bytes.
 
-Pipeline matches pinned `omarchy-transcode-ascii`: alpha-or-luma, invert, trim, resize (braille `w*2 × h*4`, block `w × h*2`), threshold, pack. Goldens are byte-identical to that script on `assets/fixtures/` — not a “visual match.”
+Pipeline follows the same stages as Omarchy’s script (alpha-or-luma, invert, trim, resize, threshold, pack). **Acceptance is committed-fixture parity** (`assets/fixtures/`), not a live ImageMagick replay — magick version, resize filter, and SVG viewport are not pinned. See [parity.md](parity.md).
 
 SVG: `resvg` with **no** external resources, scripts, network, file references, or external fonts.
 
@@ -252,10 +259,10 @@ Multi-display: independent sessions, independent random picks, shared App Group 
 |---|---|
 | Canary | Acceptance table above, macOS 26 (15 when available) |
 | `vendor/ttfx` | Upstream parity suite green after patches |
-| `fill_grid` | Asymmetric fixture: top-right glyph, bottom-left colored blank; origin + occupancy |
+| `fill_grid` | Vs ANSI oracle; asymmetric origin fixture; reverse × four occupancies |
 | Engine | [parity.md](parity.md) matrix, all 37 effects |
-| ASCII | Goldens vs pinned Omarchy script |
-| FFI | Null, panic, limit, use-after-step pointer (Swift tests must not retain) |
+| ASCII | Identity vs committed fixtures |
+| FFI | Null, panic, limit, wrong-thread, use-after-step pointer (Swift must not retain) |
 | Host | Preview still runs if the appex is uninstalled |
 
 Rust tests run on CI without a Mac. Canary and saver idle tests are local until a macOS runner exists.
@@ -268,7 +275,7 @@ About screen: “Effects by Terminal Text Effects (ChrisBuilds), Rust engine `tt
 
 ## Delivery phases
 
-0. **This spec** (revision 2).
+0. **This spec** (revision 3).
 1. **Appex canary.** Signed host+appex, fixed asymmetric grid, install/enable/idle/uninstall. **Go/no-go.**
 2. **Engine in the host.** Vendored `ttfx`, 60 Hz `step`, Metal renderer, default wordmark, random effects, parity matrix.
 3. **Engine in the canary.** Same renderer as the host, still no image UI.
@@ -281,9 +288,9 @@ About screen: “Effects by Terminal Text Effects (ChrisBuilds), Rust engine `tt
 |---|---|
 | Private appex API | Phase 1 gate; AppexSaverMinimal is the template |
 | Tick-on-vsync speed bug | 60 Hz accumulator inside Rust |
-| Colored blanks dropped | Occupancy flags; fixture test |
+| Colored blanks / reverse | Occupancy flags; reverse resolved in `fill_grid`; four-combo fixtures |
 | Vertical flip | ABI origin + asymmetric golden |
-| FFI races / panics | Serialized session, `catch_unwind`, no retained pointers |
+| FFI races / panics | Thread affinity, `catch_unwind`, `panic = "unwind"`, no retained pointers |
 | Resource bombs | Caps in the table above |
 | 60 Hz vs Omarchy 120 | Recorded in parity.md; consistent across Macs |
 | Braille looks wrong | Bundled OFL font, not SF Mono |
@@ -291,4 +298,4 @@ About screen: “Effects by Terminal Text Effects (ChrisBuilds), Rust engine `tt
 
 ## Out of scope until someone asks
 
-Per-effect knobs. Exclude lists. Multiple saved logos. Color themes beyond the engine. Intel/universal. `.saver` fallback. `CAMetalDisplayLink`. Worker-thread publish buffers (if ever: immutable snapshots only; see [ffi.md](ffi.md)).
+Per-effect knobs. Exclude lists. Multiple saved logos. Color themes beyond the engine. Intel/universal. `.saver` fallback. `CAMetalDisplayLink`. Self-update. Worker-thread sessions (if ever: a second session created on that thread, or immutable snapshots — never `Send` the original).

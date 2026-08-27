@@ -2,40 +2,58 @@
 
 What “the same as Omarchy / ttfx” means, and how we know.
 
-## Pins
+Vendoring **may not start** until these SHAs are the recorded pins (update this table if we deliberately move; do not vendor `master`/`quattro` floating).
 
-Record concrete revisions in this file when they are vendored. Until then the targets are:
+## Pins
 
 | Component | Pin |
 |---|---|
-| TTE (ttfx’s upstream) | v0.15.0, commit `7a91dd9ca6ee0c4f4b1484efee0ecac1bb84104e` |
-| ttfx | Release **0.3.2** (or the successor we vendor); store the git SHA in `vendor/ttfx` |
-| Omarchy screensaver loop | `bin/omarchy-screensaver` on the `quattro` line we vendor against |
-| Omarchy converter | `bin/omarchy-transcode-ascii` at that same revision |
-| Default art | Omarchy branding `screensaver.txt` at that revision |
+| TTE (ttfx’s upstream) | v0.15.0, `7a91dd9ca6ee0c4f4b1484efee0ecac1bb84104e` |
+| ttfx | tag **v0.3.2**, `7203e354498462064b7c0a89375051f65cf2ce99` |
+| Omarchy tree | `quattro` at `9d02bb08f896108ec83ad0984bdaafa753e9f1e8` |
+| Omarchy screensaver | `bin/omarchy-screensaver` in that tree (no `--exclude-effects`) |
+| Omarchy converter | `bin/omarchy-transcode-ascii` in that tree |
+| Default art | Omarchy default `screensaver.txt` from that tree (vendored into `assets/branding/`) |
 
-`ttfx` already treats byte-identical ANSI frames vs TTE as its standard. We do not weaken that for the CLI. Our GUI path is **cell-identical** to `fill_grid` of that same engine, not ANSI-identical (we never emit ANSI).
+`ttfx` already treats byte-identical ANSI frames vs TTE as its standard. We do not weaken that for the CLI.
+
+## Independent grid oracle
+
+`fill_grid` is **never** compared to itself.
+
+For each checked step:
+
+1. `advance` once on the engine (same seed, canvas, input).
+2. **Oracle:** take `get_formatted_output_string()` (the existing ANSI emission path, independent of `fill_grid`). Decode SGR (including reverse `7` / `27`, 24-bit and xterm color) into canonical `OmacyCell`s with the same occupancy rules as [ffi.md](ffi.md) (top-left remap). The decoder lives in **tests only**.
+3. **SUT:** `fill_grid` into a packed buffer.
+4. Compare occupancy, glyph, RGB, flags. Alpha is 0 or 255 only in MVP. Accepted differences: none.
+
+Do not implement the oracle by calling `fill_grid`. The decoder models a terminal pen (fg, bg, reverse, bold) from SGR, then snapshots to `OmacyCell` using the occupancy rules in [ffi.md](ffi.md). That snapshot logic is a **second implementation** of the ABI, not a shared function with `fill_grid`. If they disagree, `fill_grid` is wrong unless a hand-written ANSI unit test shows the decoder misreads SGR.
+
+Asymmetric fixture remains: top-right non-space glyph, bottom-left space with non-black background. Fail on swap or occupancy 0 on that blank.
+
+Reverse fixtures: four occupancy combinations × reverse on/off, compared to the ANSI oracle (not to `fill_grid` goldens).
 
 ## Clock policy
 
-| Item | Omacy | Omarchy screensaver |
+| Item | Omacy | Omarchy screensaver (pinned tree) |
 |---|---|---|
-| Step rate | 60 Hz, engine accumulator | `--frame-rate 120` (120 steps/s) |
+| Step rate | 60 Hz, engine accumulator | `--frame-rate 120` |
 | Presentation | Display link (60 or 120 Hz) | Terminal refresh |
 | `matrix` / `thunderstorm` | `Clock::real()` | real tty time |
 | Catch-up | max 4 steps per `step()` call, then drop remainder | n/a |
 
-This is an intentional divergence: Omacy speed is stable across 60 Hz and 120 Hz panels. A 120 Hz Mac will **not** match Omarchy-on-Linux wall-clock duration for stepped effects (Omarchy is ~2× our step rate). It **will** match another Omacy Mac.
+Intentional divergence: Omacy speed is stable across 60 Hz and 120 Hz panels. A 120 Hz Mac will not match Omarchy-on-Linux wall-clock duration for stepped effects.
 
-Parity tests use the 60 Hz virtual cadence: `elapsed = 1.0/60.0` per `step`, seed fixed, no catch-up (elapsed is exact).
+Parity tests use `elapsed = 1.0/60.0` per `step`, seed fixed, no catch-up.
 
 ## Effect pool
 
 All **37** `ttfx` effects. No exclude list in MVP.
 
-Current Omarchy `omarchy-screensaver` (quattro) does not pass `--exclude-effects`. Older trees excluded `dev_worm`. We follow current Omarchy: include all. If the pinned Omarchy revision excludes any, update this paragraph and the engine default to match — do not silently drift.
+Pinned `omarchy-screensaver` does not pass `--exclude-effects`. If a later Omarchy pin adds excludes, update this paragraph and the engine default together.
 
-Random choice uses ttfx’s `from_name` list in registry order and ttfx’s RNG (`xoshiro256++`). `--seed` is deterministic within ttfx, not vs CPython.
+Random choice uses ttfx’s registry order and ttfx’s RNG (`xoshiro256++`). `--seed` is deterministic within ttfx, not vs CPython.
 
 ## Grid matrix (motion)
 
@@ -43,39 +61,31 @@ For **each** of the 37 effects:
 
 | Field | Value |
 |---|---|
-| Input | Pinned Omarchy wordmark, plus one small asymmetric fixture (`fixtures/asymmetric.txt`) |
+| Input | Pinned Omarchy wordmark, plus `fixtures/asymmetric.txt` |
 | Seed | `1` |
 | Canvas | 80×24 and 160×48, centered anchors, `ignore_terminal_dimensions` |
-| Clock | 60 Hz exact steps, `Clock` as in production (`real` for wall-clock effects; tests inject a virtual clock that still *reports* real-style durations for those two by advancing the injected clock 1/60 s per step — documented in the test harness) |
+| Clock | 60 Hz exact steps; `matrix` / `thunderstorm` tests inject a virtual clock (named in the test); production uses `Clock::real()` |
 | Frames | First **180** steps, and the last frame before completion if completion is < 180 |
-| Compare | Packed `OmacyCell` bytes vs a dump from patched ttfx `fill_grid` after the same `advance` sequence |
-
-Accepted differences: none on occupancy, glyph, RGB, flags. Alpha is 0 or 255 only in MVP.
-
-`matrix` and `thunderstorm` are duration-gated. For those, the harness uses a virtual clock of 60 Hz so the test is deterministic; production still uses `Clock::real()`. That harness/production split is listed in the test name.
-
-Asymmetric fixture (both canvases, `beams` and `wipe` at least): top-right cell has a non-space glyph; bottom-left cell is a space with a non-black background. Fail if those positions are swapped or if the colored blank is occupancy 0.
+| Compare | `fill_grid` vs ANSI oracle (above) |
 
 ## Pixel matrix (presentation)
 
 Not identity. Font rasterization will not match a terminal.
 
-Accepted: the Metal view, with the bundled font at 18 pt, shows the same **grid** as `fill_grid` (spot-check occupancy map: screenshot vs a CPU-drawn bitmap of bg/fg quads). One effect (`beams`) + default wordmark + 80×24. This is a host-preview test, not CI on Linux.
+Spot-check: Metal occupancy map vs a CPU bitmap of published cells. One effect (`beams`) + default wordmark + 80×24. Host preview, not Linux CI.
 
 ## Conversion matrix
 
-`assets/fixtures/` contains PNG and SVG logos (silhouette, transparent, inverted). Goldens are produced **once** with pinned `omarchy-transcode-ascii` (ImageMagick allowed at golden-generation time, not at runtime) for:
+**Claim:** Omacy’s ascii module is byte-identical to **committed files** under `assets/fixtures/` (input image + expected `.txt` for named mode/threshold/invert/trim tuples).
 
-- braille / block
-- threshold 50 and 30
-- invert on/off
-- default width/height of the Omarchy screensaver path
+That is the acceptance test. We do **not** claim live byte identity with ImageMagick: version, delegates, colorspace, resize filter, rounding, alpha extraction, threshold, trim, and SVG viewport are not pinned and are known to drift across `magick` builds.
 
-Omacy’s ascii module must emit byte-identical text. If upstream awk/magick is unavailable on CI, the committed goldens are the source of truth; a Mac or Linux job with `magick` refreshes them when the Omarchy pin moves.
+The Omarchy script SHA is recorded so a human can regenerate fixtures on purpose. Regeneration is a manual, reviewed diff, not CI. Runtime conversion uses `image` / `resvg` with external SVG resources disabled.
 
 ## What we are not claiming
 
 - Byte-identical ANSI vs `tte` from the GUI (we do not produce ANSI).
 - Identical wall-clock length vs Omarchy’s 120 fps loop.
 - Identical pixels vs Ghostty/Kitty.
-- Bit-identical RNG vs CPython TTE (ttfx already does not).
+- Bit-identical RNG vs CPython TTE.
+- Live ImageMagick / `omarchy-transcode-ascii` identity at runtime.
