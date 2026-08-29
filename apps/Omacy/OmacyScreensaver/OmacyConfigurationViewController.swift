@@ -66,8 +66,13 @@ class OmacyConfigurationViewController: ScreenSaverConfigurationViewController {
 
     @objc private func saveAndDismiss(_ sender: Any?) {
         var settings = OmacyStore.loadSettings()
-        settings.effect = effectField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        if settings.effect.isEmpty { settings.effect = "random" }
+        let name = effectField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if name.isEmpty || name == "random" {
+            settings.effects = OmacyEffects.names
+        } else if OmacyEffects.names.contains(name) {
+            settings.effects = [name]
+        }
+        settings.syncEngineEffect()
         do {
             try OmacyStore.save(settings: settings, art: OmacyStore.loadArt())
         } catch {

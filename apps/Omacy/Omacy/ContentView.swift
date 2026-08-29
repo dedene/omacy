@@ -1,14 +1,5 @@
-//
-//  ContentView.swift
-//  Omacy
-//
-//  Copyright © 2026 Guillaume Louel. Licensed under the MIT License.
-//
-//  Main view for the host application. Shows extension registration status
-//  and provides install / uninstall and "set as active screensaver" actions.
-//
-
 import SwiftUI
+import AppKit
 
 private let logger = AppexLog.logger("HostApp")
 
@@ -18,248 +9,194 @@ struct ContentView: View {
     @State private var statusMessage = "Ready"
 
     var body: some View {
-        VStack(spacing: 20) {
-            // MARK: - Header
-            Image(systemName: "tv")
-                .font(.system(size: 60))
-                .foregroundColor(.accentColor)
-
-            Text("Omacy")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
-            Text("Screensaver Extension")
-                .font(.title2)
-                .foregroundColor(.secondary)
-
-            Divider()
-                .padding(.horizontal, 40)
-
-            // MARK: - Extension Status
-            Text("Extension Status")
-                .font(.headline)
-
-            extensionStatusView
-                .padding(.horizontal, 20)
-
-            Divider()
-                .padding(.horizontal, 40)
-
-            // MARK: - Screensaver Activation
-            Text("Screensaver Activation")
-                .font(.headline)
-
-            screensaverActivationView
-                .padding(.horizontal, 20)
-
-            Divider()
-                .padding(.horizontal, 40)
-
-            // MARK: - Actions
-            HStack(spacing: 12) {
-                Button("Open Preview") {
-                    openWindow(id: "preview")
+        NavigationStack {
+            Form {
+            Section {
+                HStack(spacing: 12) {
+                    Image(nsImage: NSApplication.shared.applicationIconImage)
+                        .resizable()
+                        .frame(width: 48, height: 48)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Omacy")
+                            .font(.headline)
+                        Text("ASCII screensaver")
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(.borderedProminent)
-
-                Button("Edit art") {
-                    openWindow(id: "config")
-                }
-                .buttonStyle(.bordered)
-
-                Button("Open Screen Saver Settings") {
-                    openScreenSaverSettings()
-                }
-                .buttonStyle(.bordered)
+                .padding(.vertical, 4)
             }
-
-            Text(statusMessage)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.top, 10)
-                .frame(maxWidth: .infinity)
-                .multilineTextAlignment(.center)
-
-            Text("Effects by Terminal Text Effects (ChrisBuilds), Rust engine ttfx.")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
+            extensionSection
+            screensaverSection
+            if statusMessage != "Ready" {
+                Section {
+                    Text(statusMessage)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Section {
+                Text("Effects by Terminal Text Effects (ChrisBuilds), Rust engine ttfx.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            }
+            .formStyle(.grouped)
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button("Preview") {
+                        openWindow(id: "preview")
+                    }
+                    Button("Art") {
+                        openWindow(id: "art")
+                    }
+                }
+                ToolbarItem(placement: .automatic) {
+                    Button("Screen Saver Settings…") {
+                        openScreenSaverSettings()
+                    }
+                }
+            }
         }
-        .padding(40)
-        .fixedSize()
+        .frame(minWidth: 520, idealWidth: 580)
     }
 
-    @ViewBuilder
-    private var extensionStatusView: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Circle()
-                        .fill(pluginManager.isInstalled ? Color.green : Color.gray)
-                        .frame(width: 10, height: 10)
-
-                    if pluginManager.isInstalled {
-                        Text("Installed")
-                            .fontWeight(.medium)
-                        if let version = pluginManager.installedVersion {
-                            Text("(v\(version))")
-                                .foregroundColor(.secondary)
-                        }
-                    } else {
-                        Text("Not registered")
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                    }
-
-                    Spacer()
-
-                    if pluginManager.isLoading {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                    } else {
-                        Button {
-                            pluginManager.checkInstallationStatus()
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        .buttonStyle(.borderless)
-                        .help("Refresh status")
-                    }
-                }
-
+    private var extensionSection: some View {
+        Section("Extension") {
+            HStack {
+                statusDot(on: pluginManager.isInstalled && !pluginManager.isPluginMissing)
                 if pluginManager.isInstalled {
-                    if pluginManager.isPluginMissing {
-                        Text("The registered screensaver extension is missing. Re-register it from this app.")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                    }
-                    if let path = pluginManager.installedPath {
-                        HStack(alignment: .top) {
-                            Text("Path:")
-                                .foregroundColor(.secondary)
-                            Text(path)
-                                .lineLimit(2)
-                                .truncationMode(.middle)
-                                .textSelection(.enabled)
-                        }
-                        .font(.caption)
-                    }
-                    if pluginManager.hasConflictingRegistrations {
-                        Text("Registered in more than one place. Unregister extras so only /Applications or DerivedData remains.")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                        ForEach(pluginManager.registeredPaths, id: \.self) { path in
-                            Text(path)
-                                .font(.caption2)
-                                .lineLimit(2)
-                                .truncationMode(.middle)
-                                .textSelection(.enabled)
-                        }
+                    Text("Installed")
+                    if let version = pluginManager.installedVersion {
+                        Text("v\(version)")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
                     }
                 } else {
-                    Text("Omacy is not in System Settings yet. Register the extension from this app — the preview still runs either way.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    if let embeddedVersion = pluginManager.embeddedVersion {
-                        Text("Embedded version: \(embeddedVersion)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    Text("Not registered")
+                        .foregroundStyle(.secondary)
                 }
-
-                if let error = pluginManager.lastError {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.red)
+                Spacer()
+                refreshButton(busy: pluginManager.isLoading) {
+                    pluginManager.checkInstallationStatus()
                 }
-
-                HStack {
-                    Spacer()
-                    if pluginManager.isInstalled && !pluginManager.isPluginMissing {
-                        Button("Uninstall") {
-                            uninstallExtension()
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(pluginManager.isLoading)
-                    } else {
-                        Button(pluginManager.isPluginMissing ? "Re-register" : "Install") {
-                            installExtension()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(pluginManager.isLoading)
-                    }
-                    Spacer()
-                }
-                .padding(.top, 4)
             }
-            .padding(8)
+
+            if pluginManager.isInstalled {
+                if pluginManager.isPluginMissing {
+                    Text("The registered screensaver extension is missing. Re-register it from this app.")
+                        .foregroundStyle(.orange)
+                }
+                if let path = pluginManager.installedPath {
+                    LabeledContent("Path") {
+                        Text(path)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if pluginManager.hasConflictingRegistrations {
+                    Text("Registered in more than one place. Unregister extras so only /Applications or DerivedData remains.")
+                        .foregroundStyle(.orange)
+                    ForEach(pluginManager.registeredPaths, id: \.self) { path in
+                        Text(path)
+                            .font(.caption)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+                    }
+                }
+            } else {
+                Text("Omacy is not in System Settings yet. Register the extension from this app — the preview still runs either way.")
+                    .foregroundStyle(.secondary)
+                if let embeddedVersion = pluginManager.embeddedVersion {
+                    LabeledContent("Embedded") {
+                        Text("v\(embeddedVersion)")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                }
+            }
+
+            if let error = pluginManager.lastError {
+                Text(error)
+                    .foregroundStyle(.red)
+            }
+
+            if pluginManager.isInstalled && !pluginManager.isPluginMissing {
+                Button("Uninstall", role: .destructive) {
+                    uninstallExtension()
+                }
+                .disabled(pluginManager.isLoading)
+            } else {
+                Button(pluginManager.isPluginMissing ? "Re-register" : "Install") {
+                    installExtension()
+                }
+                .disabled(pluginManager.isLoading)
+            }
         }
     }
 
-    @ViewBuilder
-    private var screensaverActivationView: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Circle()
-                        .fill(pluginManager.isActiveScreensaver ? Color.green : Color.gray)
-                        .frame(width: 10, height: 10)
-
-                    if pluginManager.isActiveScreensaver {
-                        Text("Active")
-                            .fontWeight(.medium)
-                    } else {
-                        Text("Not Active")
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                    }
-
-                    Spacer()
-
-                    if pluginManager.isCheckingScreensaver {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                    } else {
-                        Button {
-                            pluginManager.checkScreensaverStatus()
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        .buttonStyle(.borderless)
-                        .help("Refresh status")
-                    }
+    private var screensaverSection: some View {
+        Section("Screensaver") {
+            HStack {
+                statusDot(on: pluginManager.isActiveScreensaver)
+                if pluginManager.isActiveScreensaver {
+                    Text("Active")
+                } else {
+                    Text("Not active")
+                        .foregroundStyle(.secondary)
                 }
-
-                if let error = pluginManager.screensaverError {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                }
-
-                if pluginManager.isInstalled && !pluginManager.isActiveScreensaver {
-                    HStack {
-                        Spacer()
-                        Button("Enable as Screensaver") {
-                            Task {
-                                await pluginManager.enableAsScreensaver()
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(pluginManager.isCheckingScreensaver)
-                        Spacer()
-                    }
-                    .padding(.top, 4)
+                Spacer()
+                refreshButton(busy: pluginManager.isCheckingScreensaver) {
+                    pluginManager.checkScreensaverStatus()
                 }
             }
-            .padding(8)
+
+            if let error = pluginManager.screensaverError {
+                Text(error)
+                    .foregroundStyle(.red)
+            }
+
+            if pluginManager.isInstalled && !pluginManager.isActiveScreensaver {
+                Button("Use as Screensaver") {
+                    Task {
+                        await pluginManager.enableAsScreensaver()
+                    }
+                }
+                .disabled(pluginManager.isCheckingScreensaver)
+            }
         }
+    }
+
+    private func statusDot(on: Bool) -> some View {
+        Circle()
+            .fill(on ? Color.green : Color.secondary.opacity(0.35))
+            .frame(width: 8, height: 8)
+            .accessibilityHidden(true)
+    }
+
+    private func refreshButton(busy: Bool, action: @escaping () -> Void) -> some View {
+        Group {
+            if busy {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Button(action: action) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .help("Refresh status")
+            }
+        }
+        .frame(width: 24, height: 24)
     }
 
     private func installExtension() {
-        statusMessage = "Installing extension..."
+        statusMessage = "Installing extension…"
         do {
             try pluginManager.install()
-            statusMessage = "Extension installed successfully"
+            statusMessage = "Extension installed"
         } catch {
             statusMessage = "Install failed: \(error.localizedDescription)"
             logger.error("Install failed: \(error.localizedDescription, privacy: .public)")
@@ -267,7 +204,7 @@ struct ContentView: View {
     }
 
     private func uninstallExtension() {
-        statusMessage = "Uninstalling extension..."
+        statusMessage = "Uninstalling extension…"
         do {
             try pluginManager.uninstall()
             statusMessage = "Unregistered. Move Omacy to Trash to finish removing it. You can also delete the App Group data if you want a clean slate."

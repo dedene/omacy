@@ -8,7 +8,9 @@ use ttfx::utils::graphics::Color;
 use ttfx::utils::rng::Rng;
 
 use crate::abi::OmacyFrame;
-use crate::content::{is_known_effect, parse_utf8, validate_art, validate_effect, Content};
+use crate::content::{
+    is_known_effect, parse_utf8, pick_effect_name, validate_art, validate_effect, Content,
+};
 use crate::limits::{self, check_geometry};
 use crate::settings;
 use crate::status::EngineError;
@@ -55,6 +57,13 @@ pub struct ContentPacket {
     pub bg: [u8; 4],
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct StepPublish {
+    pub frame: OmacyFrame,
+    pub waiting: bool,
+    pub steps_taken: u8,
+}
+
 impl Session {
     pub fn create(
         art: String,
@@ -67,7 +76,10 @@ impl Session {
         clock_kind: ClockKind,
     ) -> Result<Self, EngineError> {
         let (cols, rows) = check_geometry(cols, rows)?;
-        let selected = Content::from_parts(art, effect, bg)?;
+        let mut selected = Content::from_parts(art, effect, bg)?;
+        if let Some(dir) = &config_dir {
+            selected.pool = settings::load_pool(dir);
+        }
         let pick_rng = match seed {
             Some(s) => Rng::seeded(s),
             None => Rng::from_entropy(),
@@ -135,7 +147,7 @@ impl Session {
         matches!(self.state, LiveState::Waiting)
     }
 
-    pub fn force_reentrant_step(&mut self) -> Result<(OmacyFrame, bool), EngineError> {
+    pub fn force_reentrant_step(&mut self) -> Result<StepPublish, EngineError> {
         self.stepping = true;
         let result = self.step(1.0 / 60.0);
         self.stepping = false;
@@ -217,7 +229,7 @@ impl Session {
         }
     }
 
-    pub fn step(&mut self, elapsed: f64) -> Result<(OmacyFrame, bool), EngineError> {
+    pub fn step(&mut self, elapsed: f64) -> Result<StepPublish, EngineError> {
         if self.stepping {
             return Err(EngineError::InvalidArg("re-entrant step".into()));
         }
@@ -230,13 +242,17 @@ impl Session {
         self.stepping = true;
         let inner = self.step_inner(elapsed);
         self.stepping = false;
-        let waiting = inner?;
-        Ok((self.published_c_frame(), waiting))
+        let (waiting, steps_taken) = inner?;
+        Ok(StepPublish {
+            frame: self.published_c_frame(),
+            waiting,
+            steps_taken,
+        })
     }
 
-    fn step_inner(&mut self, elapsed: f64) -> Result<bool, EngineError> {
+    fn step_inner(&mut self, elapsed: f64) -> Result<(bool, u8), EngineError> {
         if matches!(self.state, LiveState::Waiting) {
-            return Ok(true);
+            return Ok((true, 0));
         }
         if matches!(self.state, LiveState::Dead) {
             return Err(EngineError::Dead);
@@ -261,16 +277,26 @@ impl Session {
             self.accumulator = 0.0;
         }
 
-        self.fill_cache()?;
+        if steps > 0 || ended {
+            self.fill_cache()?;
+        }
+
+        // Ending still paints the last frame even if the finishing advance
+        // returned false before incrementing `steps`. Report that as a change.
+        let steps_taken = if ended {
+            steps.max(1) as u8
+        } else {
+            steps as u8
+        };
 
         if ended {
             self.accumulator = 0.0;
             self.apply_boundary_content();
             self.state = LiveState::Waiting;
-            return Ok(true);
+            return Ok((true, steps_taken));
         }
 
-        Ok(false)
+        Ok((false, steps_taken))
     }
 
     fn fill_cache(&mut self) -> Result<(), EngineError> {
@@ -301,6 +327,13 @@ impl Session {
             }
             next.effect = packet.effect;
             next.bg = packet.bg;
+            if next.effect == "random" {
+                if let Some(dir) = &self.config_dir {
+                    next.pool = settings::load_pool(dir);
+                }
+            } else {
+                next.pool.clear();
+            }
             self.selected_next = next;
             return;
         }
@@ -354,11 +387,7 @@ fn construct_effect(
     pick_rng: &mut Rng,
     clock_kind: ClockKind,
 ) -> Result<(Box<dyn Effect>, EngineCtx), EngineError> {
-    let name = if content.effect == "random" {
-        EffectCommand::NAMES[pick_rng.choice_index(EffectCommand::NAMES.len())]
-    } else {
-        content.effect.as_str()
-    };
+    let name = pick_effect_name(&content.effect, &content.pool, pick_rng);
     let mut effect = EffectCommand::from_name(name)
         .ok_or_else(|| EngineError::InvalidArg(format!("unknown effect '{name}'")))?;
     let color = Color::from_hex(&format!(

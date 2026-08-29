@@ -1,5 +1,7 @@
 # Omacy Mac host
 
+Public product docs live in the [repo root README](../../README.md). This file is the host/appex build notes.
+
 Xcode project for the host app and `com.apple.screensaver` appex.
 
 Build on macOS 15+ (deployment target 15.0). PaperSaver 0.2.0 needs Swift 6.2, so resolving packages wants Xcode 26. The appex target’s “Build Rust engine” phase runs `scripts/build-engine.sh` once; the host depends on the appex and links the same `libomacy_engine.a`.

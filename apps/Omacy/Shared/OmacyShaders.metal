@@ -39,7 +39,7 @@ vertex VertexOut omacy_vertex(uint vid [[vertex_id]],
 
 fragment float4 omacy_fragment(VertexOut in [[stage_in]],
                                texture2d<float> atlas [[texture(0)]]) {
-    constexpr sampler s(address::clamp_to_edge, filter::linear);
+    constexpr sampler s(address::clamp_to_edge, filter::nearest);
     float coverage = atlas.sample(s, in.uv).a;
     return float4(in.color.rgb, in.color.a * coverage);
 }

@@ -39,6 +39,9 @@ class OmacySaverViewController: ScreenSaverViewController {
     }
 
     override func loadView() {
+        // ScreenSaverEngine often calls this with no per-display frame. The
+        // size is a placeholder: windows start on the main display and
+        // migrate. OmacySaverView waits for that settle before creating a session.
         logger.info("loadView()")
         let frame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
         installView(frame: frame, isPreview: frame.width < 400)
@@ -51,6 +54,7 @@ class OmacySaverViewController: ScreenSaverViewController {
 
     private func installView(frame: NSRect, isPreview: Bool) {
         let view = OmacySaverView(frame: frame, isPreview: isPreview)
+        view?.autoresizingMask = [.width, .height]
         saverView = view
         self.view = view ?? NSView(frame: frame)
     }

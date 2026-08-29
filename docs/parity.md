@@ -2,7 +2,7 @@
 
 What “the same as Omarchy / ttfx” means, and how we know.
 
-Vendoring **may not start** until these SHAs are the recorded pins (update this table if we deliberately move; do not vendor `master`/`quattro` floating).
+These SHAs are the recorded pins (update this table if we deliberately move; do not vendor `master`/`quattro` floating).
 
 ## Pins
 
@@ -61,7 +61,7 @@ Reverse fixtures: four occupancy combinations × reverse on/off (`occupancy-four
 | `matrix` / `thunderstorm` | `Clock::real()` | real tty time |
 | Catch-up | max 4 steps per `step()` call, then drop remainder | n/a |
 
-Intentional divergence: Omacy speed is stable across 60 Hz and 120 Hz panels. A 120 Hz Mac will not match Omarchy-on-Linux wall-clock duration for stepped effects.
+Intentional divergence: Omacy speed is stable across 60 Hz and 120 Hz panels. A 120 Hz Mac will not match Omarchy-on-Linux wall-clock duration for stepped effects. Presentation may still run at display Hz; a 0-step callback re-encodes the last instance buffer and does not walk the grid.
 
 Parity tests use `elapsed = 1.0/60.0` per `step`, seed fixed, no catch-up.
 

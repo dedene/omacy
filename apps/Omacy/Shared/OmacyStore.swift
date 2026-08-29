@@ -1,13 +1,49 @@
 import Foundation
 import AppKit
 
+enum OmacyEffects {
+    /// Keep in lockstep with `ttfx::effects::EffectCommand::NAMES`.
+    static let names: [String] = [
+        "beams", "binarypath", "blackhole", "bouncyballs", "bubbles", "burn",
+        "colorshift", "crumble", "decrypt", "errorcorrect", "expand", "fireworks",
+        "highlight", "laseretch", "matrix", "middleout", "orbittingvolley",
+        "overflow", "pour", "print", "rain", "randomsequence", "rings",
+        "scattered", "slice", "slide", "smoke", "spotlights", "spray", "swarm",
+        "sweep", "synthgrid", "thunderstorm", "unstable", "vhstape", "waves",
+        "wipe"
+    ]
+
+    static func sanitize(_ names: [String]) -> [String] {
+        var seen = Set<String>()
+        return names.filter { name in
+            guard Self.names.contains(name), !seen.contains(name) else { return false }
+            seen.insert(name)
+            return true
+        }
+    }
+}
+
 struct OmacySettings: Equatable {
     var effect: String = "random"
+    var effects: [String] = OmacyEffects.names
     var background: String = "#000000"
     var fontSize: Double = 18
-    var asciiMode: String = "braille"
+    var asciiMode: String = "block"
     var threshold: Int = 50
     var invert: Bool = false
+
+    var engineEffect: String {
+        let selected = OmacyEffects.sanitize(effects)
+        if selected.count == 1 { return selected[0] }
+        return "random"
+    }
+
+    mutating func syncEngineEffect() {
+        let selected = Set(OmacyEffects.sanitize(effects))
+        effects = OmacyEffects.names.filter { selected.contains($0) }
+        if effects.isEmpty { effects = OmacyEffects.names }
+        effect = engineEffect
+    }
 
     var backgroundRGBA: (UInt8, UInt8, UInt8, UInt8) {
         let hex = background.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
@@ -71,6 +107,16 @@ enum OmacyStore {
             if let asciiMode = obj["asciiMode"] as? String { s.asciiMode = asciiMode }
             if let threshold = obj["threshold"] as? Int { s.threshold = threshold }
             if let invert = obj["invert"] as? Bool { s.invert = invert }
+            if let list = obj["effects"] as? [String] {
+                s.effects = OmacyEffects.sanitize(list)
+            } else if s.effect == "random" || s.effect.isEmpty {
+                s.effects = OmacyEffects.names
+            } else if OmacyEffects.names.contains(s.effect) {
+                s.effects = [s.effect]
+            } else {
+                s.effects = OmacyEffects.names
+            }
+            s.syncEngineEffect()
             lastGoodSettings = s
             lastLoadError = nil
             return s
@@ -96,8 +142,11 @@ enum OmacyStore {
             throw NSError(domain: "Omacy", code: 1, userInfo: [NSLocalizedDescriptionKey: "App Group container missing"])
         }
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        var settings = settings
+        settings.syncEngineEffect()
         let payload: [String: Any] = [
             "effect": settings.effect,
+            "effects": settings.effects,
             "background": settings.background,
             "fontSize": settings.fontSize,
             "asciiMode": settings.asciiMode,
@@ -115,6 +164,10 @@ enum OmacyStore {
 
     static func restoreDefaultArt() throws {
         try save(settings: loadSettings(), art: bundledArt)
+    }
+
+    static func resetToDefaults() throws {
+        try save(settings: OmacySettings(), art: bundledArt)
     }
 
     static var forceCanary: Bool {

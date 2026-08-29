@@ -292,12 +292,13 @@ pub unsafe extern "C" fn omacy_session_step(
             return OmacyStatus::Dead;
         }
         match session.step(elapsed_seconds) {
-            Ok((frame, waiting)) => {
+            Ok(publish) => {
                 unsafe {
                     *out = OmacyStepResult {
-                        frame,
-                        needs_begin_next: u8::from(waiting),
-                        _pad: [0; 3],
+                        frame: publish.frame,
+                        needs_begin_next: u8::from(publish.waiting),
+                        steps_taken: publish.steps_taken,
+                        _pad: [0; 2],
                     };
                 }
                 OmacyStatus::Ok

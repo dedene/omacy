@@ -1,6 +1,6 @@
 # macOS canary and idle gates
 
-The engine is proven with `cargo test`. Host `.app` + screensaver `.appex` **compile** on Xcode 26.6 (this Mac, unsigned arm64 Release) and via GitHub Actions `macos.yml` on `macos-26`. Idle / System Settings listing remains a **signed-install Mac gate** and is not claimed by this change.
+The engine is proven with `cargo test`. Host `.app` + screensaver `.appex` **compile** on Xcode 26 (unsigned arm64 Release) and via GitHub Actions `macos.yml` on `macos-26`. Idle / System Settings listing remains a **signed-install Mac gate** and is not claimed by CI.
 
 Host sources include last-known-good App Group writes, stop-before-start lifecycle, Metal→CALayer canary fallback, occupancy constants, atlas white-pixel UVs, dead-session recreate, pending-config on save, uninstall “move Omacy to Trash” copy, About credit, and missing/unelected appex recovery. Those still need a signed run to execute in ScreenSaverEngine.
 
@@ -12,7 +12,7 @@ Host sources include last-known-good App Group writes, stop-before-start lifecyc
 | Thumbnail 107×65 / 214×130 | Landscape canary fixture PNGs present; System Settings listing unverified |
 | Enable via PaperSaver `setScreensaverEverywhere` and Settings | Sources present; unverified |
 | Idle activation on macOS 26 | Unverified |
-| Multi-display paints the fixture / engine | Unverified |
+| Multi-display paints the fixture / engine | Code waits for ScreenSaverEngine’s per-window screen migration and uses per-window backing scale; idle paint still unverified |
 | Teardown: `willstop` / window-nil; no leak after Settings open/close | Unverified |
 | Uninstall: host unregisters; does not delete the bundle | Unverified |
 | Recovery: missing/unelected appex | Unverified |

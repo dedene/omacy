@@ -11,7 +11,7 @@ final class OmacyCanaryAnimator {
 
     var currentBackgroundColor: NSColor { .black }
 
-    func attach(to layer: CALayer) {
+    func attach(to layer: CALayer, scale: CGFloat) {
         parentLayer = layer
         layer.backgroundColor = NSColor.black.cgColor
         layer.isOpaque = true
@@ -23,7 +23,7 @@ final class OmacyCanaryAnimator {
         glyphLayer.string = "X"
         glyphLayer.foregroundColor = NSColor.white.cgColor
         glyphLayer.alignmentMode = .center
-        glyphLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 2
+        glyphLayer.contentsScale = max(scale, 1)
         if blankLayer.superlayer == nil { gridLayer.addSublayer(blankLayer) }
         if glyphLayer.superlayer == nil { gridLayer.addSublayer(glyphLayer) }
     }
@@ -31,11 +31,12 @@ final class OmacyCanaryAnimator {
     func start() {}
     func stop() {}
 
-    func updateBounds(_ bounds: CGRect) {
+    func updateBounds(_ bounds: CGRect, scale: CGFloat) {
+        let resolved = max(scale, 1)
         gridLayer.frame = bounds
         let font = OmacyFont.makeFont(size: OmacyLayout.defaultFontSize)
-        let scale = NSScreen.main?.backingScaleFactor ?? 2
-        let layout = OmacyLayout.grid(viewSize: bounds.size, scale: scale, font: font)
+        glyphLayer.contentsScale = resolved
+        let layout = OmacyLayout.grid(viewSize: bounds.size, scale: resolved, font: font)
         let cell = layout.cell
         let origin = layout.origin
         blankLayer.frame = CGRect(
@@ -52,18 +53,5 @@ final class OmacyCanaryAnimator {
         )
         glyphLayer.font = font
         glyphLayer.fontSize = font.pointSize
-    }
-}
-
-enum OmacyFont {
-    static func makeFont(size: CGFloat) -> NSFont {
-        if let url = OmacyStore.bundledFontURL,
-           let data = try? Data(contentsOf: url) as CFData,
-           let provider = CGDataProvider(data: data),
-           let cg = CGFont(provider),
-           let font = CTFontCreateWithGraphicsFont(cg, size, nil, nil) as NSFont? {
-            return font
-        }
-        return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
     }
 }

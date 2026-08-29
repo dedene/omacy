@@ -4,15 +4,13 @@ macOS screensaver that replays Omarchy’s ASCII text-effects loop: a logo (or a
 
 Stack: **patched `ttfx` → C ABI cell grid → Metal renderer → host app + `.appex`.**
 
-Revision 7 of this design. Implementation starts only after this revision is accepted.
-
 Companion contracts: [ffi.md](ffi.md) (ABI, threading, occupancy, origin) and [parity.md](parity.md) (pins, clock, 37-effect matrix).
 
 ## Goal
 
 When the Mac idles, every connected display runs a `ttfx` effect on a centered ASCII/Braille logo against the configured background (black by default), then the next effect. Speed is the same on a 60 Hz display and a 120 Hz ProMotion display.
 
-Configuration lives in the **host app**: paste art, generate art from a PNG/SVG, pick an effect or random, restore the default wordmark. System Settings shows the saver, its thumbnail, and (later) a thin sheet for effect choice — not the image converter. The converter needs `NSOpenPanel`; the appex sandbox did not present that panel.
+Configuration lives in the **host app**: paste art, generate art from a PNG/SVG, tick the idle shuffle, live-preview a highlighted effect, restore the default wordmark. System Settings shows the saver, its thumbnail, and a thin sheet — not the image converter. The converter needs `NSOpenPanel`; the appex sandbox did not present that panel.
 
 Fidelity is **measured**, not vibed. Motion is cell-grid identity against an **independent ANSI oracle** over pinned `ttfx`, for all 37 effects. Image conversion is identity against **committed fixtures**, not a live ImageMagick replay. Font rasterization is allowed to differ. See [parity.md](parity.md).
 
@@ -22,7 +20,7 @@ Fidelity is **measured**, not vibed. Motion is cell-grid identity against an **i
 - Reimplementing the 37 effects.
 - Legacy `.saver` as the shipping format.
 - Wallpaper-continuity / lock-screen stills.
-- Python TTE, ImageMagick at runtime, effect exclude-lists, per-effect knobs.
+- Python TTE, ImageMagick at runtime, per-effect knobs.
 - Filesystem watchers. Settings reload at session start and at effect boundaries only.
 - A separate `omacy-ascii` crate. Conversion stays an internal engine module until a second consumer exists.
 - A worker-thread renderer. Production sessions live on the main thread only.
@@ -51,8 +49,8 @@ Fidelity is **measured**, not vibed. Motion is cell-grid identity against an **i
 | Settings | App Group; pending **content** or disk at boundary | No `cols`/`rows` in replaceable config |
 | Install | DMG → drag to `/Applications` | Sandboxed app cannot copy/update/delete itself |
 | Image convert | Internal engine module, host-only UI | One consumer; `NSOpenPanel` is in the app |
-| Effect pool | All 37, no excludes | Matches current Omarchy `omarchy-screensaver` |
-| OS floor | macOS 15; develop on 26 | Appex since Sonoma; Peter is on Tahoe |
+| Effect pool | Include-list in `settings.json` (`effects`); missing or all 37 → every ttfx name | Art window checkboxes; default is still all 37 |
+| OS floor | macOS 15; develop on 26 | Appex since Sonoma; current development is on macOS 26 |
 | Displays | One session per saver view | Omarchy launches one `ttfx` per monitor |
 
 Private API is accepted and **gated**. If the canary does not appear in System Settings, activate on idle, and paint every display on macOS 26 (and 15 when we have a box), we stop. The host preview remains a fallback product, not a substitute for the gate.
@@ -150,21 +148,21 @@ Layout, from view bounds in **points** and the backing scale factor:
 - Cell width = advance of `M` in the bundled font.
 - `cols = floor(viewWidth / cellWidth)`, `rows = floor(viewHeight / cellHeight)`, both ≥ 1, both capped (see Limits).
 - `cols * rows` uses checked multiplication; overflow is a failed resize, last grid kept.
-- Remainder is margin; it shows `frame.clear_*`. The grid is centered.
+- Remainder is margin; it shows `frame.clear_*`. The grid is centered. Origin is snapped to backing pixels.
 - If `cols,rows` change after a 50 ms debounce, call `resize`. In `RUNNING` that stores `pending_geometry`; the live effect keeps its construction size; `cells` stay valid. Center the published grid in the view; extra area is `frame.clear_*`; clip if the grid is larger than the view. Font-size changes that alter cell counts use the same path. Apply the new size only in `WAITING_FOR_BEGIN` (after uploading the completed frame), then `begin_next`. Mid-effect remapping is out of scope.
 
 Preview uses the **same 18 pt**. Smaller bounds ⇒ fewer cells. Do not shrink the preview font: that would increase cell count.
 
-Tahoe may hand backing pixels as the view’s `bounds`. Compare `convertToBacking` / `backingScaleFactor` and treat an exact 2× jump as scale, not a giant canvas.
+Tahoe may hand backing pixels as the view’s `bounds`. Compare `convertToBacking` / `backingScaleFactor` and treat an exact 2× jump as scale, not a giant canvas. `drawableSize` and the vertex viewport use that treated point size, never `bounds * scale` blindly.
 
 Metal:
 
-1. Atlas once per font size: printable ASCII, Braille `U+2800…U+28FF`, block drawing used by conversion. Extra glyphs from effects rasterize lazily up to the atlas cap; beyond that, draw background only.
-2. Each presented frame: walk cells. If `has_background`, instance a bg quad. If `has_glyph` and the glyph has coverage, instance a fg quad. Unoccupied cells are skipped (`frame.clear_*` shows). Do not interpret `reverse` — it is already resolved. Do not read `flags` (always 0).
+1. Atlas once per font size: printable ASCII, Braille `U+2800…U+28FF`, block drawing used by conversion. Glyphs are rasterized at backing scale with a 1 px gutter, baseline = `CTFontGetDescent`, sampled `nearest`. Extra glyphs from effects rasterize lazily up to the atlas cap (slot `replace` only); beyond that, draw background only. The bundled font is loaded once and cached by size.
+2. When `steps_taken > 0` (or layout/atlas changed): walk cells into the next ring `MTLBuffer`. If `has_background`, instance a bg quad. If `has_glyph` and the glyph has coverage, instance a fg quad. Unoccupied cells are skipped (`frame.clear_*` shows). Do not interpret `reverse` — it is already resolved. Do not read `flags` (always 0). When `steps_taken == 0`, skip the walk and re-encode the last instance buffer.
 3. Clear color = `frame.clear_*` (the published frame’s background). Not `selected_next.background`, and not a hardcoded `#000000` once settings can change it.
-4. Triple-buffered instance storage. Upload or copy **immediately after** `step` returns, **before** a waiting `resize` or `begin_next`. A `RUNNING` `resize` does not invalidate the pointer.
+4. Triple-buffered instance storage with `DispatchSemaphore(3)`. Never skip a present because buffers are busy. Upload **immediately after** `step` returns, **before** a waiting `resize` or `begin_next`. A `RUNNING` `resize` does not invalidate the pointer. Disable implicit CALayer actions when setting `frame` / `drawableSize` / `contentsScale`.
 
-Display link: `NSView.displayLink(target:selector:)` added to the **main** run loop (`.common`). Appex `SSENeedsAnimationTimer = false`. Create the session on the main thread when the view has a window (`viewDidMoveToWindow`, `startAnimation`). Stop on the main thread in this order: `omacy_session_destroy`, then invalidate the link, then drop Metal. Triggers: `stopAnimation`, nil window, `com.apple.screensaver.willstop`. `deinit` asserts if the session is still alive and only then attempts destroy — it is not the primary path. Preferred frame rate: fullscreen max (60–120), Settings preview 30 Hz.
+Display link: `NSView.displayLink(target:selector:)` added to the **main** run loop (`.common`). Appex `SSENeedsAnimationTimer = false`. Create the session on the main thread **after the saver window has settled on its real display** (`NSWindow.didChangeScreenNotification`, a bounds match against `window.screen`, or a 250 ms fallback). ScreenSaverEngine first places every window on the main display and may keep the main display’s size for tens of milliseconds; starting at the first `viewDidMoveToWindow` would size every session to `NSScreen.main`. Backing scale is the view’s own window/screen, never `NSScreen.main`. If bounds still change before the first present, pending geometry applies immediately. Stop on the main thread in this order: `omacy_session_destroy`, then invalidate the link, then drop Metal. Triggers: `stopAnimation`, nil window, `com.apple.screensaver.willstop`. `deinit` asserts if the session is still alive and only then attempts destroy — it is not the primary path. Preferred frame rate: fullscreen max (60–120), Settings preview 30 Hz. Recreate the display link if the window moves to another screen.
 
 `CAMetalDisplayLink` is a measured alternative, not the default.
 
@@ -218,7 +216,7 @@ settings.json
   "effect": "random",
   "background": "#000000",
   "fontSize": 18,
-  "asciiMode": "braille",
+  "asciiMode": "block",
   "threshold": 50,
   "invert": false
 }
@@ -273,7 +271,7 @@ Preload is ASCII `0x20–0x7E` + Braille block + conversion block characters. Pa
 - Settings preview can leak views. `OmacyRenderer.stop` is the primary cleanup. `deinit` asserts if a session remains.
 - After a rebuild, re-register; `killall ScreenSaverEngine` is a documented dev hammer.
 
-Multi-display: independent sessions, independent random picks, shared App Group files.
+Multi-display: independent sessions, independent random picks, shared App Group files. Each saver view fills its window (`autoresizingMask`) and waits for ScreenSaverEngine’s main-display → real-display window migration before `attach`. Mixed-DPI desks use per-window `backingScaleFactor` for the atlas and Metal drawable.
 
 ## Testing
 
@@ -297,7 +295,9 @@ About screen: “Effects by Terminal Text Effects (ChrisBuilds), Rust engine `tt
 
 ## Delivery phases
 
-0. **This spec** (revision 7).
+The implementation followed this order:
+
+0. **Architecture spec.**
 1. **Appex canary.** Signed host+appex, fixed asymmetric grid, install/enable/idle/uninstall. **Go/no-go.**
 2. **Engine in the host.** Vendored `ttfx`, 60 Hz `step`, Metal renderer, default wordmark, random effects, parity matrix. **Worst-case gate:** all 37 effects, maximum grid (32_768 cells), at least three simultaneous sessions. Main-thread `step` + upload + encode must stay under 8.3 ms (one 120 Hz frame). Miss the budget: lower the presentation cap or the cell cap; do not ship a 120 Hz link that misses.
 3. **Engine in the canary.** Same renderer as the host, still no image UI.

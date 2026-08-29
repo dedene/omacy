@@ -1,4 +1,4 @@
-use omacy_engine::session::{ClockKind, Session};
+use omacy_engine::session::{ClockKind, Session, StepPublish};
 use omacy_engine::status::EngineError;
 
 fn wordmark() -> String {
@@ -26,7 +26,7 @@ fn session(effect: &str, cols: u32, rows: u32) -> Session {
 #[test]
 fn create_and_step_publishes_grid() {
     let mut s = session("beams", 80, 24);
-    let (frame, waiting) = s.step(1.0 / 60.0).unwrap();
+    let StepPublish { frame, waiting, .. } = s.step(1.0 / 60.0).unwrap();
     assert!(!waiting);
     assert_eq!(frame.cols, 80);
     assert_eq!(frame.rows, 24);
@@ -37,10 +37,10 @@ fn create_and_step_publishes_grid() {
 #[test]
 fn running_resize_is_pending() {
     let mut s = session("beams", 80, 24);
-    let (before, _) = s.step(1.0 / 60.0).unwrap();
+    let before = s.step(1.0 / 60.0).unwrap().frame;
     let ptr = before.cells;
     s.resize(100, 30).unwrap();
-    let (after, waiting) = s.step(1.0 / 60.0).unwrap();
+    let StepPublish { frame: after, waiting, .. } = s.step(1.0 / 60.0).unwrap();
     assert!(!waiting);
     assert_eq!(after.cols, 80);
     assert_eq!(after.rows, 24);
@@ -110,7 +110,7 @@ fn waiting_resize_applies_and_clears_cache() {
     let mut s = session("wipe", 20, 8);
     let mut waiting = false;
     for _ in 0..10_000 {
-        let (_, w) = s.step(1.0 / 60.0).unwrap();
+        let w = s.step(1.0 / 60.0).unwrap().waiting;
         if w {
             waiting = true;
             break;
@@ -118,12 +118,12 @@ fn waiting_resize_applies_and_clears_cache() {
     }
     assert!(waiting, "wipe should complete on a tiny canvas");
     s.resize(24, 10).unwrap();
-    let (frame, still) = s.step(1.0 / 60.0).unwrap();
+    let StepPublish { frame, waiting: still, .. } = s.step(1.0 / 60.0).unwrap();
     assert!(still);
     assert_eq!(frame.cols, 24);
     assert_eq!(frame.rows, 10);
     s.begin_next().unwrap();
-    let (frame, waiting) = s.step(1.0 / 60.0).unwrap();
+    let StepPublish { frame, waiting, .. } = s.step(1.0 / 60.0).unwrap();
     assert!(!waiting);
     assert_eq!(frame.cols, 24);
     assert_eq!(frame.rows, 10);
@@ -171,7 +171,7 @@ fn pending_background_is_not_published_clear() {
     let mut waiting = false;
     let mut last_clear = [0u8; 4];
     for _ in 0..10_000 {
-        let (frame, w) = s.step(1.0 / 60.0).unwrap();
+        let StepPublish { frame, waiting: w, .. } = s.step(1.0 / 60.0).unwrap();
         last_clear = [frame.clear_r, frame.clear_g, frame.clear_b, frame.clear_a];
         if w {
             waiting = true;
@@ -181,7 +181,7 @@ fn pending_background_is_not_published_clear() {
     assert!(waiting);
     assert_eq!(last_clear, [0, 0, 0, 255]);
     s.begin_next().unwrap();
-    let (frame, waiting) = s.step(1.0 / 60.0).unwrap();
+    let StepPublish { frame, waiting, .. } = s.step(1.0 / 60.0).unwrap();
     assert!(!waiting);
     assert_eq!(
         [frame.clear_r, frame.clear_g, frame.clear_b, frame.clear_a],
@@ -202,7 +202,7 @@ fn status_strings_are_nul_terminated() {
 #[test]
 fn mark_dead_clears_published_cells() {
     let mut s = session("beams", 20, 8);
-    let (frame, _) = s.step(1.0 / 60.0).unwrap();
+    let frame = s.step(1.0 / 60.0).unwrap().frame;
     assert!(!frame.cells.is_null());
     s.mark_dead("test".into());
     assert!(s.is_dead());
@@ -212,7 +212,7 @@ fn mark_dead_clears_published_cells() {
 
 fn wait_for_end(s: &mut Session) {
     for _ in 0..20_000 {
-        let (_, waiting) = s.step(1.0 / 60.0).unwrap();
+        let waiting = s.step(1.0 / 60.0).unwrap().waiting;
         if waiting {
             return;
         }
@@ -231,7 +231,7 @@ fn pending_queued_while_waiting_applies_at_following_boundary() {
     })
     .unwrap();
     s.begin_next().unwrap();
-    let (frame, waiting) = s.step(1.0 / 60.0).unwrap();
+    let StepPublish { frame, waiting, .. } = s.step(1.0 / 60.0).unwrap();
     assert!(!waiting);
     assert_eq!(
         [frame.clear_r, frame.clear_g, frame.clear_b, frame.clear_a],
@@ -240,7 +240,7 @@ fn pending_queued_while_waiting_applies_at_following_boundary() {
     );
     wait_for_end(&mut s);
     s.begin_next().unwrap();
-    let (frame, waiting) = s.step(1.0 / 60.0).unwrap();
+    let StepPublish { frame, waiting, .. } = s.step(1.0 / 60.0).unwrap();
     assert!(!waiting);
     assert_eq!(
         [frame.clear_r, frame.clear_g, frame.clear_b, frame.clear_a],
@@ -252,16 +252,16 @@ fn pending_queued_while_waiting_applies_at_following_boundary() {
 fn begin_next_consumes_running_pending_geometry() {
     let mut s = session("wipe", 20, 8);
     s.resize(30, 12).unwrap();
-    let (frame, _) = s.step(1.0 / 60.0).unwrap();
+    let frame = s.step(1.0 / 60.0).unwrap().frame;
     assert_eq!(frame.cols, 20);
     assert_eq!(frame.rows, 8);
     wait_for_end(&mut s);
-    let (frame, waiting) = s.step(1.0 / 60.0).unwrap();
+    let StepPublish { frame, waiting, .. } = s.step(1.0 / 60.0).unwrap();
     assert!(waiting);
     assert_eq!(frame.cols, 20);
     assert_eq!(frame.rows, 8);
     s.begin_next().unwrap();
-    let (frame, waiting) = s.step(1.0 / 60.0).unwrap();
+    let StepPublish { frame, waiting, .. } = s.step(1.0 / 60.0).unwrap();
     assert!(!waiting);
     assert_eq!(frame.cols, 30);
     assert_eq!(frame.rows, 12);
@@ -317,4 +317,32 @@ fn ascii_line_cap() {
 #[test]
 fn effect_pool_is_thirty_seven() {
     assert_eq!(ttfx::effects::EffectCommand::NAMES.len(), 37);
+}
+
+#[test]
+fn zero_elapsed_step_reports_zero_advances() {
+    let mut s = session("wipe", 40, 12);
+    let first = s.step(1.0 / 60.0).unwrap();
+    assert!(first.steps_taken >= 1);
+    assert!(!first.waiting);
+    let second = s.step(0.0).unwrap();
+    assert_eq!(second.steps_taken, 0);
+    assert_eq!(second.frame.cells, first.frame.cells);
+}
+
+#[test]
+fn sub_dt_elapsed_does_not_advance() {
+    let mut s = session("wipe", 40, 12);
+    s.step(1.0 / 60.0).unwrap();
+    let r = s.step(1.0 / 120.0).unwrap();
+    assert_eq!(r.steps_taken, 0);
+}
+
+#[test]
+fn waiting_republish_reports_zero_advances() {
+    let mut s = session("wipe", 20, 8);
+    wait_for_end(&mut s);
+    let r = s.step(1.0 / 60.0).unwrap();
+    assert!(r.waiting);
+    assert_eq!(r.steps_taken, 0);
 }

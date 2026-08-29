@@ -33,7 +33,7 @@ fn three_max_grid_sessions_step_under_budget() {
 
     let started = Instant::now();
     for session in &mut sessions {
-        let (frame, _) = session.step(1.0 / 60.0).expect("budget step");
+        let frame = session.step(1.0 / 60.0).expect("budget step").frame;
         assert_eq!(frame.cols * frame.rows, 32_768);
         assert!(!frame.cells.is_null());
     }

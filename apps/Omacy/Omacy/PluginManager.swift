@@ -42,6 +42,23 @@ class PluginManager: ObservableObject {
     private let paperSaver = PaperSaver()
     private let screensaverDisplayName = "Omacy"
 
+    /// PaperSaver looks up modules by the `.appex` filename, not CFBundleDisplayName.
+    /// Ours ships as `OmacyScreensaver.appex`, so `module: "Omacy"` 404s.
+    private var paperSaverModuleName: String {
+        let available = paperSaver.listAvailableScreensavers()
+        if let hit = available.first(where: { $0.path.path.contains(bundleIdentifier) }) {
+            return hit.name
+        }
+        if let path = embeddedExtensionPath ?? installedPath {
+            let fileName = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+            if available.contains(where: { $0.name == fileName }) {
+                return fileName
+            }
+            return fileName
+        }
+        return screensaverDisplayName
+    }
+
     /// Path to the embedded extension in the app bundle.
     var embeddedExtensionPath: String? {
         Bundle.main.builtInPlugInsURL?.appendingPathComponent("OmacyScreensaver.appex").path
@@ -100,7 +117,7 @@ class PluginManager: ObservableObject {
 
     /// Query pluginkit for our extension's registration status.
     /// Line format we look for:
-    ///   `+    be.zenjoy.omacy.screensaver(1.0) <path>`
+    ///   `+    be.zenjoy.omacy.screensaver(0.1.0) <path>`
     private func queryPluginKit() async throws -> [PluginMatch] {
         let output = try runProcess("/usr/bin/pluginkit", arguments: ["-m", "-v", "-p", "com.apple.screensaver"])
 
@@ -196,7 +213,8 @@ class PluginManager: ObservableObject {
         screensaverError = nil
 
         let activeScreensavers = paperSaver.getActiveScreensavers()
-        isActiveScreensaver = activeScreensavers.contains(screensaverDisplayName)
+        let names: Set<String> = [paperSaverModuleName, screensaverDisplayName]
+        isActiveScreensaver = activeScreensavers.contains { names.contains($0) }
         isCheckingScreensaver = false
     }
 
@@ -206,7 +224,9 @@ class PluginManager: ObservableObject {
         screensaverError = nil
 
         do {
-            try await paperSaver.setScreensaverEverywhere(module: screensaverDisplayName)
+            let module = paperSaverModuleName
+            logger.info("setScreensaverEverywhere module=\(module, privacy: .public)")
+            try await paperSaver.setScreensaverEverywhere(module: module)
             checkScreensaverStatus()
         } catch {
             screensaverError = error.localizedDescription

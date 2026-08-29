@@ -109,6 +109,8 @@ typedef struct {
 
 `config_dir` is create-only. Later disk reloads always use that path. `OmacyPendingConfig` cannot change it.
 
+`settings.json` may include `effects`, a JSON array of ttfx names (the idle shuffle). Missing, empty, or a full 37-name list means every effect. Unknown names are dropped. This is disk-only — not a C ABI field. When `effect` is `"random"`, the session picks from that pool at `create` and at each `begin_next`.
+
 Validation on `OmacySessionConfig` / `OmacyPendingConfig` (all `INVALID_ARG` unless noted `LIMIT`):
 
 - `effect` is `"random"` or a known ttfx name (exact, lowercase).
@@ -221,7 +223,8 @@ Present this callback’s frame (the completed effect’s last frame when enteri
 typedef struct {
   OmacyFrame frame;
   uint8_t    needs_begin_next; /* 1 iff WAITING_FOR_BEGIN; last frame is in `frame` */
-  uint8_t    _pad[3];
+  uint8_t    steps_taken;      /* 0..MAX_STEPS_PER_CALL; 0 iff published cells unchanged */
+  uint8_t    _pad[2];
 } OmacyStepResult;
 
 omacy_status omacy_session_create(const OmacySessionConfig *cfg,
@@ -243,9 +246,9 @@ const char  *omacy_status_string(omacy_status status);
 
 `step`: if `out == NULL` → `OMACY_ERR_NULL`. Do not dereference `out`. Session state is unchanged.
 
-`step` (`RUNNING`): main thread. Accumulate 60 Hz (architecture.md). If the effect ends this call: `fill_grid` the last frame using the **current** background as `clear_*` / `term_bg`, cache that frame, reset the 60 Hz accumulator to 0, apply **boundary content** into `selected_next` (below) **without changing geometry, without applying `pending_geometry`, and without rewriting the cache**, enter `WAITING_FOR_BEGIN`, set `needs_begin_next = 1`, do **not** construct the next effect, publish the cached frame. Otherwise stay `RUNNING`, `needs_begin_next = 0`. On failure with a non-null `out`: zero `out->frame` (`cells` NULL, `clear_*` 0) and `needs_begin_next = 0`.
+`step` (`RUNNING`): main thread. Accumulate 60 Hz (architecture.md). `steps_taken` is the number of `advance` calls this invocation (0..4). Skip `fill_grid` when `steps_taken == 0` and the effect did not end — published `cells` are the previous cache. If the effect ends this call: `fill_grid` the last frame using the **current** background as `clear_*` / `term_bg` (even if the finishing `advance` returned false before incrementing the step count; in that case `steps_taken` is still **1** because the published bytes changed), cache that frame, reset the 60 Hz accumulator to 0, apply **boundary content** into `selected_next` (below) **without changing geometry, without applying `pending_geometry`, and without rewriting the cache**, enter `WAITING_FOR_BEGIN`, set `needs_begin_next = 1`, do **not** construct the next effect, publish the cached frame. Otherwise stay `RUNNING`, `needs_begin_next = 0`. On failure with a non-null `out`: zero `out->frame` (`cells` NULL, `clear_*` 0), `needs_begin_next = 0`, and `steps_taken = 0`.
 
-`step` (`WAITING_FOR_BEGIN`): main thread. Republish the cached frame (same `clear_*`) with `needs_begin_next = 1`. Do **not** advance, do **not** touch the accumulator (already 0), do **not** reload disk, do **not** consume pending content, do **not** apply `pending_geometry`, do **not** change `generation`. Reject NaN / negative / infinite `elapsed` as `INVALID_ARG` without leaving this state and without changing the cache; if `out` is non-null, zero the published result. After a successful `resize` in this state, the cache is an unpainted grid at the new size with the **same captured `clear_*`**; republish that.
+`step` (`WAITING_FOR_BEGIN`): main thread. Republish the cached frame (same `clear_*`) with `needs_begin_next = 1` and `steps_taken = 0`. Do **not** advance, do **not** touch the accumulator (already 0), do **not** reload disk, do **not** consume pending content, do **not** apply `pending_geometry`, do **not** change `generation`. Reject NaN / negative / infinite `elapsed` as `INVALID_ARG` without leaving this state and without changing the cache; if `out` is non-null, zero the published result. After a successful `resize` in this state, the cache is an unpainted grid at the new size with the **same captured `clear_*`**; republish that.
 
 `resize`: main thread. The only call that *requests* a geometry change. Legal in `RUNNING` and `WAITING_FOR_BEGIN`. Validate `cols`/`rows` (same caps as `create`). On failure: `pending_geometry` and current dimensions unchanged; `cells` remains valid.
 

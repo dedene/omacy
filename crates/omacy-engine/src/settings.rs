@@ -3,13 +3,14 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::content::{parse_hex_color, validate_art, validate_effect, Content};
+use crate::content::{parse_hex_color, sanitize_pool, validate_art, validate_effect, Content};
 use crate::status::EngineError;
 
 #[derive(Debug, Deserialize)]
 struct SettingsFile {
     effect: Option<String>,
     background: Option<String>,
+    effects: Option<Vec<String>>,
 }
 
 pub fn load_from_dir(dir: &Path, fallback: &Content) -> Content {
@@ -39,12 +40,31 @@ pub fn load_from_dir(dir: &Path, fallback: &Content) -> Content {
                         next.bg = rgba;
                     }
                 }
+                next.pool = match parsed.effects {
+                    Some(list) => sanitize_pool(&list),
+                    None if next.effect != "random" => vec![next.effect.clone()],
+                    None => Vec::new(),
+                };
             }
         }
         Err(_) => {}
     }
 
     next
+}
+
+pub fn load_pool(dir: &Path) -> Vec<String> {
+    let path = dir.join("settings.json");
+    let Ok(text) = fs::read_to_string(&path) else {
+        return Vec::new();
+    };
+    let Ok(parsed) = serde_json::from_str::<SettingsFile>(&text) else {
+        return Vec::new();
+    };
+    match parsed.effects {
+        Some(list) => sanitize_pool(&list),
+        None => Vec::new(),
+    }
 }
 
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), EngineError> {
@@ -86,6 +106,50 @@ mod tests {
         assert_eq!(next.effect, "beams");
         assert_eq!(next.bg, [1, 2, 3, 255]);
         assert_eq!(next.art, "HELLO");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn missing_effects_key_with_random_is_all() {
+        let dir = env::temp_dir().join(format!("omacy-pool-all-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("settings.json"), b"{\"effect\":\"random\"}").unwrap();
+        fs::write(dir.join("screensaver.txt"), b"HELLO").unwrap();
+        let fallback = Content::from_parts("FALLBACK".into(), "beams".into(), [0, 0, 0, 255]).unwrap();
+        let next = load_from_dir(&dir, &fallback);
+        assert_eq!(next.effect, "random");
+        assert!(next.pool.is_empty());
+        assert!(load_pool(&dir).is_empty());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn effects_array_becomes_pool() {
+        let dir = env::temp_dir().join(format!("omacy-pool-sub-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("settings.json"),
+            br#"{"effect":"random","effects":["wipe","nope","beams","wipe"]}"#,
+        )
+        .unwrap();
+        fs::write(dir.join("screensaver.txt"), b"HELLO").unwrap();
+        let fallback = Content::from_parts("FALLBACK".into(), "random".into(), [0, 0, 0, 255]).unwrap();
+        let next = load_from_dir(&dir, &fallback);
+        assert_eq!(next.pool, vec!["wipe".to_string(), "beams".to_string()]);
+        assert_eq!(load_pool(&dir), next.pool);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn legacy_named_effect_without_array_is_a_one_name_pool() {
+        let dir = env::temp_dir().join(format!("omacy-pool-one-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("settings.json"), b"{\"effect\":\"wipe\"}").unwrap();
+        fs::write(dir.join("screensaver.txt"), b"HELLO").unwrap();
+        let fallback = Content::from_parts("FALLBACK".into(), "random".into(), [0, 0, 0, 255]).unwrap();
+        let next = load_from_dir(&dir, &fallback);
+        assert_eq!(next.effect, "wipe");
+        assert_eq!(next.pool, vec!["wipe".to_string()]);
         let _ = fs::remove_dir_all(&dir);
     }
 }

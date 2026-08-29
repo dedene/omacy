@@ -43,7 +43,8 @@ impl OmacyFrame {
 pub struct OmacyStepResult {
     pub frame: OmacyFrame,
     pub needs_begin_next: u8,
-    pub _pad: [u8; 3],
+    pub steps_taken: u8,
+    pub _pad: [u8; 2],
 }
 
 impl OmacyStepResult {
@@ -51,7 +52,8 @@ impl OmacyStepResult {
         Self {
             frame: OmacyFrame::zeroed(),
             needs_begin_next: 0,
-            _pad: [0; 3],
+            steps_taken: 0,
+            _pad: [0; 2],
         }
     }
 }
@@ -143,6 +145,14 @@ mod tests {
         assert_eq!(align_of::<OmacyAsciiConfig>(), 4);
         assert_eq!(offset_of!(OmacyAsciiConfig, mode), 0);
         assert_eq!(offset_of!(OmacyAsciiConfig, threshold), 12);
+    }
+
+    #[test]
+    fn step_result_layout() {
+        assert_eq!(offset_of!(OmacyStepResult, needs_begin_next), 24);
+        assert_eq!(offset_of!(OmacyStepResult, steps_taken), 25);
+        assert_eq!(size_of::<OmacyStepResult>(), 32);
+        assert_eq!(align_of::<OmacyStepResult>(), 8);
     }
 
     #[test]

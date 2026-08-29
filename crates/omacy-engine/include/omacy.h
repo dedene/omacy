@@ -42,7 +42,8 @@ typedef struct {
 typedef struct {
   OmacyFrame frame;
   uint8_t needs_begin_next;
-  uint8_t _pad[3];
+  uint8_t steps_taken;
+  uint8_t _pad[2];
 } OmacyStepResult;
 
 typedef struct {

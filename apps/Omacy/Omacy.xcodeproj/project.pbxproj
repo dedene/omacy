@@ -28,6 +28,10 @@
 		1A0000A1000000000000000A /* OmacyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000090000000000000000B /* OmacyRenderer.swift */; };
 		1A0000A2000000000000000A /* OmacyLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000091000000000000000B /* OmacyLayout.swift */; };
 		1A0000A3000000000000000A /* OmacyLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000091000000000000000B /* OmacyLayout.swift */; };
+		1A0000F0000000000000000A /* OmacyFont.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000F0000000000000000B /* OmacyFont.swift */; };
+		1A0000F1000000000000000A /* OmacyFont.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000F0000000000000000B /* OmacyFont.swift */; };
+		1A0000F2000000000000000A /* OmacyQuads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000F2000000000000000B /* OmacyQuads.swift */; };
+		1A0000F3000000000000000A /* OmacyQuads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000F2000000000000000B /* OmacyQuads.swift */; };
 		1A0000A4000000000000000A /* OmacyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000092000000000000000B /* OmacyStore.swift */; };
 		1A0000A5000000000000000A /* OmacyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000092000000000000000B /* OmacyStore.swift */; };
 		1A0000A6000000000000000A /* OmacyAtlas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000093000000000000000B /* OmacyAtlas.swift */; };
@@ -36,6 +40,8 @@
 		1A0000A9000000000000000A /* OmacyShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 1A000094000000000000000B /* OmacyShaders.metal */; };
 		1A0000AA000000000000000A /* OmacyHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000095000000000000000B /* OmacyHostView.swift */; };
 		1A0000AB000000000000000A /* ConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000096000000000000000B /* ConfigView.swift */; };
+		1A0000C2000000000000000A /* ArtEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000C2000000000000000B /* ArtEditor.swift */; };
+		1A0000D2000000000000000A /* ArtShuffle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000D2000000000000000B /* ArtShuffle.swift */; };
 		1A0000AC000000000000000A /* FairfaxHD.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1A000097000000000000000B /* FairfaxHD.ttf */; };
 		1A0000AD000000000000000A /* FairfaxHD.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1A000097000000000000000B /* FairfaxHD.ttf */; };
 		1A0000AE000000000000000A /* screensaver.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1A000098000000000000000B /* screensaver.txt */; };
@@ -100,11 +106,15 @@
 		1A000064000000000000000B /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		1A000090000000000000000B /* OmacyRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyRenderer.swift; sourceTree = "<group>"; };
 		1A000091000000000000000B /* OmacyLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyLayout.swift; sourceTree = "<group>"; };
+		1A0000F0000000000000000B /* OmacyFont.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyFont.swift; sourceTree = "<group>"; };
+		1A0000F2000000000000000B /* OmacyQuads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyQuads.swift; sourceTree = "<group>"; };
 		1A000092000000000000000B /* OmacyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyStore.swift; sourceTree = "<group>"; };
 		1A000093000000000000000B /* OmacyAtlas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyAtlas.swift; sourceTree = "<group>"; };
 		1A000094000000000000000B /* OmacyShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = OmacyShaders.metal; sourceTree = "<group>"; };
 		1A000095000000000000000B /* OmacyHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyHostView.swift; sourceTree = "<group>"; };
 		1A000096000000000000000B /* ConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigView.swift; sourceTree = "<group>"; };
+		1A0000C2000000000000000B /* ArtEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtEditor.swift; sourceTree = "<group>"; };
+		1A0000D2000000000000000B /* ArtShuffle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtShuffle.swift; sourceTree = "<group>"; };
 		1A000097000000000000000B /* FairfaxHD.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = FairfaxHD.ttf; path = ../../assets/fonts/FairfaxHD.ttf; sourceTree = SOURCE_ROOT; };
 		1A000098000000000000000B /* screensaver.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = screensaver.txt; path = ../../assets/branding/screensaver.txt; sourceTree = SOURCE_ROOT; };
 		1A000099000000000000000B /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = OFL.txt; path = ../../assets/fonts/OFL.txt; sourceTree = SOURCE_ROOT; };
@@ -160,6 +170,8 @@
 				1A000032000000000000000B /* PluginManager.swift */,
 				1A000095000000000000000B /* OmacyHostView.swift */,
 				1A000096000000000000000B /* ConfigView.swift */,
+				1A0000C2000000000000000B /* ArtEditor.swift */,
+				1A0000D2000000000000000B /* ArtShuffle.swift */,
 				1A000062000000000000000B /* PreviewView.swift */,
 				1A000063000000000000000B /* PreviewViewRepresentable.swift */,
 				1A00009C000000000000000B /* Omacy-Bridging-Header.h */,
@@ -200,6 +212,8 @@
 				1A00009D000000000000000B /* OmacyCanaryAnimator.swift */,
 				1A000090000000000000000B /* OmacyRenderer.swift */,
 				1A000091000000000000000B /* OmacyLayout.swift */,
+				1A0000F0000000000000000B /* OmacyFont.swift */,
+				1A0000F2000000000000000B /* OmacyQuads.swift */,
 				1A000092000000000000000B /* OmacyStore.swift */,
 				1A000093000000000000000B /* OmacyAtlas.swift */,
 				1A000094000000000000000B /* OmacyShaders.metal */,
@@ -398,11 +412,15 @@
 				1A000066000000000000000A /* Logger.swift in Sources */,
 				1A0000A0000000000000000A /* OmacyRenderer.swift in Sources */,
 				1A0000A2000000000000000A /* OmacyLayout.swift in Sources */,
+				1A0000F0000000000000000A /* OmacyFont.swift in Sources */,
+				1A0000F2000000000000000A /* OmacyQuads.swift in Sources */,
 				1A0000A4000000000000000A /* OmacyStore.swift in Sources */,
 				1A0000A6000000000000000A /* OmacyAtlas.swift in Sources */,
 				1A0000A8000000000000000A /* OmacyShaders.metal in Sources */,
 				1A0000AA000000000000000A /* OmacyHostView.swift in Sources */,
 				1A0000AB000000000000000A /* ConfigView.swift in Sources */,
+				1A0000C2000000000000000A /* ArtEditor.swift in Sources */,
+				1A0000D2000000000000000A /* ArtShuffle.swift in Sources */,
 				1A000062000000000000000A /* PreviewView.swift in Sources */,
 				1A000063000000000000000A /* PreviewViewRepresentable.swift in Sources */,
 				1A0000B6000000000000000A /* OmacyCanaryAnimator.swift in Sources */,
@@ -421,6 +439,8 @@
 				1A0000B7000000000000000A /* OmacyCanaryAnimator.swift in Sources */,
 				1A0000A1000000000000000A /* OmacyRenderer.swift in Sources */,
 				1A0000A3000000000000000A /* OmacyLayout.swift in Sources */,
+				1A0000F1000000000000000A /* OmacyFont.swift in Sources */,
+				1A0000F3000000000000000A /* OmacyQuads.swift in Sources */,
 				1A0000A5000000000000000A /* OmacyStore.swift in Sources */,
 				1A0000A7000000000000000A /* OmacyAtlas.swift in Sources */,
 				1A0000A9000000000000000A /* OmacyShaders.metal in Sources */,
@@ -577,7 +597,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = be.zenjoy.omacy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				HEADER_SEARCH_PATHS = (
@@ -626,7 +646,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = be.zenjoy.omacy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				HEADER_SEARCH_PATHS = (
@@ -682,7 +702,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = be.zenjoy.omacy.screensaver;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -741,7 +761,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = be.zenjoy.omacy.screensaver;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
