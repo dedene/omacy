@@ -9,7 +9,9 @@ use crate::status::EngineError;
 
 pub fn validate_ascii_config(cfg: OmacyAsciiConfig) -> Result<OmacyAsciiConfig, EngineError> {
     if cfg.mode != OMACY_ASCII_BRAILLE && cfg.mode != OMACY_ASCII_BLOCK {
-        return Err(EngineError::InvalidArg("ascii mode must be braille or block".into()));
+        return Err(EngineError::InvalidArg(
+            "ascii mode must be braille or block".into(),
+        ));
     }
     if cfg.width < 1 || cfg.width > limits::CONV_COLUMNS {
         return Err(EngineError::Limit("conversion width out of range".into()));
@@ -22,13 +24,17 @@ pub fn validate_ascii_config(cfg: OmacyAsciiConfig) -> Result<OmacyAsciiConfig, 
         .checked_mul(cfg.height)
         .ok_or_else(|| EngineError::Limit("conversion cell count overflow".into()))?;
     if cells > limits::CONV_CELLS {
-        return Err(EngineError::Limit("conversion cell count exceeds cap".into()));
+        return Err(EngineError::Limit(
+            "conversion cell count exceeds cap".into(),
+        ));
     }
     if cfg.threshold > 100 {
         return Err(EngineError::InvalidArg("threshold must be 0..=100".into()));
     }
     if cfg.invert > 1 || cfg.trim > 1 {
-        return Err(EngineError::InvalidArg("invert and trim must be 0 or 1".into()));
+        return Err(EngineError::InvalidArg(
+            "invert and trim must be 0 or 1".into(),
+        ));
     }
     Ok(cfg)
 }
@@ -86,8 +92,8 @@ fn decode_svg(bytes: &[u8]) -> Result<RgbaImage, EngineError> {
     options.fontdb_mut().set_cursive_family("");
     options.fontdb_mut().set_fantasy_family("");
     options.fontdb_mut().set_monospace_family("");
-    let tree = usvg::Tree::from_data(bytes, &options)
-        .map_err(|e| EngineError::Engine(e.to_string()))?;
+    let tree =
+        usvg::Tree::from_data(bytes, &options).map_err(|e| EngineError::Engine(e.to_string()))?;
     if count_svg_nodes(&tree.root()) > limits::SVG_ELEMENTS {
         return Err(EngineError::Limit("SVG element count exceeds cap".into()));
     }
@@ -108,7 +114,11 @@ fn decode_svg(bytes: &[u8]) -> Result<RgbaImage, EngineError> {
         let x = (i as u32) % width;
         let y = (i as u32) / width;
         let rgba = px.demultiply();
-        img.put_pixel(x, y, image::Rgba([rgba.red(), rgba.green(), rgba.blue(), rgba.alpha()]));
+        img.put_pixel(
+            x,
+            y,
+            image::Rgba([rgba.red(), rgba.green(), rgba.blue(), rgba.alpha()]),
+        );
     }
     Ok(img)
 }
@@ -288,10 +298,7 @@ fn pack_block(img: &image::GrayImage) -> String {
 }
 
 fn trim_output_lines(text: &str) -> String {
-    let mut lines: Vec<String> = text
-        .lines()
-        .map(|l| l.trim_end().to_string())
-        .collect();
+    let mut lines: Vec<String> = text.lines().map(|l| l.trim_end().to_string()).collect();
     while lines.first().is_some_and(|l| l.is_empty()) {
         lines.remove(0);
     }

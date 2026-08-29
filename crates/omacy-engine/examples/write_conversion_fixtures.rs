@@ -1,8 +1,9 @@
 //! Generate committed conversion goldens. Run from repo root:
 //! `cargo run -p omacy-engine --example write_conversion_fixtures`
 
-use omacy_engine::abi::{OmacyAsciiConfig, OMACY_ASCII_BLOCK, OMACY_ASCII_BRAILLE};
-use omacy_engine::ascii::ascii_from_bytes;
+use omacy_engine::fixture_tools::{
+    ascii_from_bytes, OmacyAsciiConfig, OMACY_ASCII_BLOCK, OMACY_ASCII_BRAILLE,
+};
 use std::fs;
 use std::path::PathBuf;
 
@@ -38,7 +39,14 @@ fn alpha_png(w: u32, h: u32) -> Vec<u8> {
     buf
 }
 
-fn cfg(mode: u32, width: u32, height: u32, threshold: u8, invert: u8, trim: u8) -> OmacyAsciiConfig {
+fn cfg(
+    mode: u32,
+    width: u32,
+    height: u32,
+    threshold: u8,
+    invert: u8,
+    trim: u8,
+) -> OmacyAsciiConfig {
     OmacyAsciiConfig {
         mode,
         width,

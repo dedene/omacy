@@ -48,6 +48,35 @@ struct OmacyApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        do {
+            let legacyGroup = "group.be.zenjoy.omacy"
+            try OmacyStore.performHostMigrationIfNeeded(
+                defaults: {
+                    guard let defaults = UserDefaults(suiteName: legacyGroup) else { return nil }
+                    return OmacyLegacyConfiguration(
+                        settingsData: defaults.data(forKey: "settingsJSON"),
+                        art: defaults.string(forKey: "screensaverArt")
+                    )
+                },
+                files: {
+                    guard let directory = FileManager.default.containerURL(
+                        forSecurityApplicationGroupIdentifier: legacyGroup
+                    ) else { return nil }
+                    return OmacyLegacyConfiguration(
+                        settingsData: try? Data(contentsOf: directory.appendingPathComponent("settings.json")),
+                        art: try? String(
+                            contentsOf: directory.appendingPathComponent("screensaver.txt"),
+                            encoding: .utf8
+                        )
+                    )
+                }
+            )
+        } catch {
+            // Migration is one-shot by design; normal loading will use public,
+            // cached, or bundled configuration without prompting again.
+            NSLog("Omacy configuration migration failed: %@", error.localizedDescription)
+        }
+        OmacyUpdateRecoveryLauncher.reconcileAfterLaunch()
         SparkleUpdater.shared.start()
         if CommandLine.arguments.contains("--art") {
             NotificationCenter.default.post(name: .omacyOpenArt, object: nil)

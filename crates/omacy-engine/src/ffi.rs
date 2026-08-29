@@ -1,13 +1,11 @@
 use std::cell::RefCell;
 use std::os::raw::c_char;
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::path::PathBuf;
 use std::ptr;
 use std::slice;
 
 use crate::abi::{
-    slice_ptr_len, OmacyAsciiConfig, OmacyPendingConfig, OmacySessionConfig, OmacyStepResult,
-    OmacyText,
+    slice_ptr_len, OmacyAsciiConfig, OmacyByteSlice, OmacySessionConfig, OmacyStepResult, OmacyText,
 };
 use crate::ascii;
 use crate::session::{self, ClockKind, Session};
@@ -66,6 +64,33 @@ fn zero_step(out: *mut OmacyStepResult) {
     }
 }
 
+unsafe fn parse_effect_pool(
+    effect_pool: *const OmacyByteSlice,
+    effect_pool_count: usize,
+) -> Result<Vec<String>, EngineError> {
+    if effect_pool.is_null() && effect_pool_count != 0 {
+        return Err(EngineError::InvalidArg(
+            "null effect pool with nonzero count".into(),
+        ));
+    }
+    if effect_pool_count > ttfx::effects::EffectCommand::NAMES.len() {
+        return Err(EngineError::Limit(
+            "effect pool exceeds catalog size".into(),
+        ));
+    }
+    if effect_pool_count == 0 {
+        return Ok(Vec::new());
+    }
+    let slices = unsafe { slice::from_raw_parts(effect_pool, effect_pool_count) };
+    let mut pool = Vec::with_capacity(slices.len());
+    for item in slices {
+        let bytes = unsafe { slice_ptr_len(item.ptr, item.len)? }.unwrap_or(&[]);
+        pool.push(crate::content::parse_utf8(bytes, "effect pool entry")?);
+    }
+    crate::content::validate_pool(&pool)?;
+    Ok(pool)
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn omacy_session_create(
     cfg: *const OmacySessionConfig,
@@ -91,21 +116,6 @@ pub unsafe extern "C" fn omacy_session_create(
             set_tls_error("has_seed must be 0 or 1");
             return OmacyStatus::InvalidArg;
         }
-        let config_dir = match unsafe { slice_ptr_len(cfg.config_dir, cfg.config_dir_len) } {
-            Ok(Some(b)) => match std::str::from_utf8(b) {
-                Ok(s) if !s.is_empty() => Some(PathBuf::from(s)),
-                Ok(_) => None,
-                Err(_) => {
-                    set_tls_error("config_dir is not UTF-8");
-                    return OmacyStatus::InvalidArg;
-                }
-            },
-            Ok(None) => None,
-            Err(e) => {
-                set_tls_error(e.message());
-                return e.status();
-            }
-        };
         let ascii = match unsafe { slice_ptr_len(cfg.ascii, cfg.ascii_len) } {
             Ok(v) => v,
             Err(e) => {
@@ -120,8 +130,8 @@ pub unsafe extern "C" fn omacy_session_create(
                 return e.status();
             }
         };
-        if ascii.is_none() && config_dir.is_none() {
-            set_tls_error("ascii or config_dir is required");
+        if ascii.is_none() {
+            set_tls_error("ascii is required");
             return OmacyStatus::InvalidArg;
         }
         let effect = match session::parse_c_string(effect, true, "effect") {
@@ -131,24 +141,19 @@ pub unsafe extern "C" fn omacy_session_create(
                 return e.status();
             }
         };
-        let art = if let Some(bytes) = ascii {
-            match crate::content::parse_utf8(bytes, "ascii") {
-                Ok(s) => s,
-                Err(e) => {
-                    set_tls_error(e.message());
-                    return e.status();
-                }
+        let pool = match unsafe { parse_effect_pool(cfg.effect_pool, cfg.effect_pool_count) } {
+            Ok(pool) => pool,
+            Err(e) => {
+                set_tls_error(e.message());
+                return e.status();
             }
-        } else if let Some(dir) = &config_dir {
-            match std::fs::read_to_string(dir.join("screensaver.txt")) {
-                Ok(s) => s,
-                Err(_) => {
-                    set_tls_error("screensaver.txt missing from config_dir");
-                    return OmacyStatus::InvalidArg;
-                }
+        };
+        let art = match crate::content::parse_utf8(ascii.expect("checked above"), "ascii") {
+            Ok(s) => s,
+            Err(e) => {
+                set_tls_error(e.message());
+                return e.status();
             }
-        } else {
-            String::new()
         };
         let seed = if cfg.has_seed == 1 {
             Some(cfg.seed)
@@ -158,8 +163,8 @@ pub unsafe extern "C" fn omacy_session_create(
         match Session::create(
             art,
             effect,
+            pool,
             [cfg.bg_r, cfg.bg_g, cfg.bg_b, cfg.bg_a],
-            config_dir,
             seed,
             cols,
             rows,
@@ -253,13 +258,9 @@ fn with_live_session(
 
 /// Induces a panic inside the same `catch_unwind` wrapper as session FFI.
 /// Not part of the C ABI; engine tests use it to prove `cells` is invalidated.
+#[cfg(test)]
 pub unsafe fn debug_induce_panic(s: *mut Session) -> OmacyStatus {
     with_live_session(s, |_| panic!("omacy induced panic"))
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn omacy_session_resize(s: *mut Session, cols: u32, rows: u32) -> OmacyStatus {
-    with_live_session(s, |session| session.resize(cols, rows))
 }
 
 #[no_mangle]
@@ -325,32 +326,74 @@ pub unsafe extern "C" fn omacy_session_step(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn omacy_session_set_pending_config(
+pub unsafe extern "C" fn omacy_session_begin_next_with_config(
     s: *mut Session,
-    cfg: *const OmacyPendingConfig,
+    content: *const u8,
+    content_len: usize,
+    effect_pool: *const OmacyByteSlice,
+    effect_pool_count: usize,
+    cols: u32,
+    rows: u32,
 ) -> OmacyStatus {
     with_live_session(s, |session| {
-        if cfg.is_null() {
-            return Err(EngineError::Null);
+        let content = unsafe { slice_ptr_len(content, content_len)? }
+            .ok_or_else(|| EngineError::InvalidArg("content is required".into()))?;
+        let art = crate::content::parse_utf8(content, "content")?;
+        let pool = unsafe { parse_effect_pool(effect_pool, effect_pool_count)? };
+        session.begin_next_with_config(art, pool, cols, rows)
+    })
+}
+
+/// Returns the number of immutable, process-lifetime effect names.
+/// Safe to call from any thread.
+#[no_mangle]
+pub extern "C" fn omacy_effect_catalog_count() -> usize {
+    ttfx::effects::EffectCommand::NAMES.len()
+}
+
+/// Borrows one immutable effect name. The returned pointer remains valid for
+/// the life of the process and must not be freed. Safe to call from any thread.
+/// On every failure both outputs are cleared.
+#[no_mangle]
+pub unsafe extern "C" fn omacy_effect_catalog_get(
+    index: usize,
+    out_ptr: *mut *const u8,
+    out_len: *mut usize,
+) -> OmacyStatus {
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        if !out_ptr.is_null() {
+            unsafe { *out_ptr = ptr::null() };
         }
-        let cfg = unsafe { &*cfg };
-        let ascii = unsafe { slice_ptr_len(cfg.ascii, cfg.ascii_len)? };
-        let effect = unsafe { slice_ptr_len(cfg.effect, cfg.effect_len)? };
-        let packet = session::parse_pending(ascii, effect, [cfg.bg_r, cfg.bg_g, cfg.bg_b, cfg.bg_a])?;
-        session.set_pending(packet)
+        if !out_len.is_null() {
+            unsafe { *out_len = 0 };
+        }
+        if out_ptr.is_null() || out_len.is_null() {
+            return OmacyStatus::Null;
+        }
+        let Some(name) = ttfx::effects::EffectCommand::NAMES.get(index) else {
+            set_tls_error("effect catalog index out of range");
+            return OmacyStatus::InvalidArg;
+        };
+        unsafe {
+            *out_ptr = name.as_ptr();
+            *out_len = name.len();
+        }
+        OmacyStatus::Ok
+    }));
+    result.unwrap_or_else(|_| {
+        set_tls_error("panic");
+        if !out_ptr.is_null() && !out_len.is_null() {
+            unsafe {
+                *out_ptr = ptr::null();
+                *out_len = 0;
+            }
+        }
+        OmacyStatus::Panic
     })
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn omacy_session_begin_next(s: *mut Session) -> OmacyStatus {
-    with_live_session(s, |session| session.begin_next())
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn omacy_session_generation(
-    s: *const Session,
-    out: *mut u64,
-) -> OmacyStatus {
+pub unsafe extern "C" fn omacy_session_generation(s: *const Session, out: *mut u64) -> OmacyStatus {
     let result = catch_unwind(AssertUnwindSafe(|| {
         if out.is_null() {
             set_tls_error("null out");
@@ -427,8 +470,8 @@ pub unsafe extern "C" fn omacy_session_destroy(s: *mut Session) {
 }
 
 #[no_mangle]
-pub extern "C" fn omacy_status_string(status: i32) -> *const c_char {
-    let text = match status {
+pub extern "C" fn omacy_status_string(status: OmacyStatus) -> *const c_char {
+    let text = match status.0 {
         0 => OmacyStatus::Ok.as_c_str(),
         1 => OmacyStatus::Null.as_c_str(),
         2 => OmacyStatus::InvalidArg.as_c_str(),

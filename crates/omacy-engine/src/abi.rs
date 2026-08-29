@@ -1,10 +1,10 @@
-use std::os::raw::c_char;
-
 use ttfx::engine::PackedCell;
 
 pub type OmacyCell = PackedCell;
 
+#[allow(dead_code)] // Exported to C by cbindgen.
 pub const OMACY_CELL_HAS_BACKGROUND: u8 = ttfx::engine::CELL_HAS_BACKGROUND;
+#[allow(dead_code)] // Exported to C by cbindgen.
 pub const OMACY_CELL_HAS_GLYPH: u8 = ttfx::engine::CELL_HAS_GLYPH;
 
 pub const OMACY_ASCII_BRAILLE: u32 = 0;
@@ -60,12 +60,14 @@ impl OmacyStepResult {
 
 #[repr(C)]
 pub struct OmacySessionConfig {
-    pub config_dir: *const u8,
-    pub config_dir_len: usize,
     pub ascii: *const u8,
     pub ascii_len: usize,
     pub effect: *const u8,
     pub effect_len: usize,
+    /// Optional include list for random effect selection. A count of zero
+    /// means the complete effect catalog; the pointer is ignored in that case.
+    pub effect_pool: *const OmacyByteSlice,
+    pub effect_pool_count: usize,
     pub bg_r: u8,
     pub bg_g: u8,
     pub bg_b: u8,
@@ -75,17 +77,13 @@ pub struct OmacySessionConfig {
     pub seed: u64,
 }
 
+/// A borrowed byte string. The pointed-to bytes are only borrowed for the
+/// duration of the FFI call and are never retained by the engine.
 #[repr(C)]
-pub struct OmacyPendingConfig {
-    pub ascii: *const u8,
-    pub ascii_len: usize,
-    pub effect: *const u8,
-    pub effect_len: usize,
-    pub bg_r: u8,
-    pub bg_g: u8,
-    pub bg_b: u8,
-    pub bg_a: u8,
-    pub _pad: [u8; 3],
+#[derive(Clone, Copy, Debug)]
+pub struct OmacyByteSlice {
+    pub ptr: *const u8,
+    pub len: usize,
 }
 
 #[repr(C)]
@@ -122,10 +120,6 @@ pub unsafe fn slice_ptr_len<'a>(
     }
 }
 
-pub fn c_str_static(s: &'static str) -> *const c_char {
-    s.as_ptr() as *const c_char
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,6 +147,28 @@ mod tests {
         assert_eq!(offset_of!(OmacyStepResult, steps_taken), 25);
         assert_eq!(size_of::<OmacyStepResult>(), 32);
         assert_eq!(align_of::<OmacyStepResult>(), 8);
+    }
+
+    #[test]
+    fn byte_slice_layout() {
+        assert_eq!(offset_of!(OmacyByteSlice, ptr), 0);
+        assert_eq!(offset_of!(OmacyByteSlice, len), size_of::<*const u8>());
+        assert_eq!(
+            size_of::<OmacyByteSlice>(),
+            size_of::<*const u8>() + size_of::<usize>()
+        );
+    }
+
+    #[test]
+    fn session_config_layout() {
+        assert_eq!(offset_of!(OmacySessionConfig, ascii), 0);
+        assert_eq!(offset_of!(OmacySessionConfig, effect), 16);
+        assert_eq!(offset_of!(OmacySessionConfig, effect_pool), 32);
+        assert_eq!(offset_of!(OmacySessionConfig, effect_pool_count), 40);
+        assert_eq!(offset_of!(OmacySessionConfig, bg_r), 48);
+        assert_eq!(offset_of!(OmacySessionConfig, seed), 56);
+        assert_eq!(size_of::<OmacySessionConfig>(), 64);
+        assert_eq!(align_of::<OmacySessionConfig>(), 8);
     }
 
     #[test]

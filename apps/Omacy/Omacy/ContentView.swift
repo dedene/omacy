@@ -207,7 +207,7 @@ struct ContentView: View {
         statusMessage = "Uninstalling extension…"
         do {
             try pluginManager.uninstall()
-            statusMessage = "Unregistered. Move Omacy to Trash to finish removing it. You can also delete the App Group data if you want a clean slate."
+            statusMessage = "Unregistered. Move Omacy to Trash to finish removing it. Your art and settings remain in ~/.config/omacy."
         } catch {
             statusMessage = "Uninstall failed: \(error.localizedDescription)"
             logger.error("Uninstall failed: \(error.localizedDescription, privacy: .public)")

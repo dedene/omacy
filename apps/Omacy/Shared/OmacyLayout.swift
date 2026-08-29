@@ -78,8 +78,23 @@ enum OmacyLayout {
         scale: CGFloat,
         font: NSFont
     ) -> (cols: UInt32, rows: UInt32, cell: CGSize, origin: CGPoint) {
+        grid(
+            viewSize: viewSize,
+            backing: backing,
+            scale: scale,
+            cell: cellSize(font: font)
+        )
+    }
+
+    /// Pure geometry path. Keeping cell metrics separate from font lookup makes
+    /// the grid math deterministic and independently testable across OS fonts.
+    static func grid(
+        viewSize: CGSize,
+        backing: CGSize,
+        scale: CGFloat,
+        cell: CGSize
+    ) -> (cols: UInt32, rows: UInt32, cell: CGSize, origin: CGPoint) {
         let points = treatedAsPoints(viewSize: viewSize, backing: backing, scale: scale)
-        let cell = cellSize(font: font)
         var cols = max(Self.minCells, Int(floor(points.width / cell.width)))
         var rows = max(Self.minCells, Int(floor(points.height / cell.height)))
         cols = min(cols, Self.maxAxis)
@@ -89,8 +104,6 @@ enum OmacyLayout {
             cols = max(Self.minCells, Int(Double(cols) * ratio))
             rows = max(Self.minCells, Int(Double(rows) * ratio))
         }
-        let gridWidth = CGFloat(cols) * cell.width
-        let gridHeight = CGFloat(rows) * cell.height
         let origin = publishedOrigin(
             cols: UInt32(cols),
             rows: UInt32(rows),

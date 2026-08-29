@@ -366,9 +366,6 @@ def archive_release!(version:, build_number:)
     export_method: "developer-id",
     export_options: "fastlane/ExportOptions.plist",
     xcargs: [
-      "ARCHS=arm64",
-      "ONLY_ACTIVE_ARCH=YES",
-      "EXCLUDED_ARCHS=x86_64",
       "MARKETING_VERSION=#{Shellwords.escape(version)}",
       "CURRENT_PROJECT_VERSION=#{Shellwords.escape(build_number)}",
       "SPARKLE_PUBLIC_ED_KEY=#{Shellwords.escape(sparkle_public_ed_key)}"

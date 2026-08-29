@@ -1,6 +1,6 @@
 //! fill_grid vs ANSI oracle for the 37-effect matrix.
 
-use omacy_engine::abi::OmacyCell;
+use crate::abi::OmacyCell;
 use ttfx::effects::EffectCommand;
 use ttfx::engine::ctx::{Clock, EngineCtx};
 use ttfx::engine::terminal::TerminalConfig;
@@ -49,9 +49,13 @@ fn compare_frame(name: &str, packed: &[OmacyCell], ansi: &str, cols: u32, rows: 
 fn run_effect(name: &str, input: &str, cols: i64, rows: i64, frames: u32) {
     let mut effect = EffectCommand::from_name(name).unwrap_or_else(|| panic!("{name}"));
     let config = TerminalConfig::gui(cols, rows, Color::from_hex("000000").unwrap());
-    let mut ctx =
-        EngineCtx::new(input, config, Rng::seeded(1), Clock::virtual_with_frame_rate(60))
-            .expect("ctx");
+    let mut ctx = EngineCtx::new(
+        input,
+        config,
+        Rng::seeded(1),
+        Clock::virtual_with_frame_rate(60),
+    )
+    .expect("ctx");
     ctx.suppress_ansi = false;
     effect.build(&mut ctx).expect("build");
     let mut packed = vec![OmacyCell::default(); (cols * rows) as usize];

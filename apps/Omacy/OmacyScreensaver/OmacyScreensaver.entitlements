@@ -4,9 +4,10 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<key>com.apple.security.app-groups</key>
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
 	<array>
-		<string>group.be.zenjoy.omacy</string>
+		<string>/.config/omacy/screensaver.txt</string>
+		<string>/.config/omacy/settings.json</string>
 	</array>
 	<key>com.apple.security.cs.disable-library-validation</key>
 	<true/>

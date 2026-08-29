@@ -19,15 +19,29 @@
 		1A000087000000000000000A /* thumbnail.png in Resources */ = {isa = PBXBuildFile; fileRef = 1A000087000000000000000B /* thumbnail.png */; };
 		1A000088000000000000000A /* thumbnail@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 1A000088000000000000000B /* thumbnail@2x.png */; };
 		1A000032000000000000000A /* PluginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000032000000000000000B /* PluginManager.swift */; };
-		1A000060000000000000000A /* OmacyCanaryAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000060000000000000000B /* OmacyCanaryAnimator.swift */; };
-		1A000061000000000000000A /* OmacyCanaryAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000060000000000000000B /* OmacyCanaryAnimator.swift */; };
-		1A000062000000000000000A /* PreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000062000000000000000B /* PreviewView.swift */; };
 		1A000063000000000000000A /* PreviewViewRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000063000000000000000B /* PreviewViewRepresentable.swift */; };
 		1A000066000000000000000A /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000064000000000000000B /* Logger.swift */; };
 		1A000067000000000000000A /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000064000000000000000B /* Logger.swift */; };
 		1A000070000000000000000A /* PaperSaverKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1A000070000000000000000B /* PaperSaverKit */; };
 		1A0000A0000000000000000A /* OmacyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000090000000000000000B /* OmacyRenderer.swift */; };
 		1A0000A1000000000000000A /* OmacyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000090000000000000000B /* OmacyRenderer.swift */; };
+		1AR00001000000000000000A /* OmacyMetalGridRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AR00001000000000000000B /* OmacyMetalGridRenderer.swift */; };
+		1AR00002000000000000000A /* OmacyMetalGridRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AR00001000000000000000B /* OmacyMetalGridRenderer.swift */; };
+		1AR00003000000000000000A /* OmacyDisplayLinkDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AR00002000000000000000B /* OmacyDisplayLinkDriver.swift */; };
+		1AR00004000000000000000A /* OmacyDisplayLinkDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AR00002000000000000000B /* OmacyDisplayLinkDriver.swift */; };
+		1AF00002000000000000000A /* OmacyFrameResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AF00002000000000000000B /* OmacyFrameResources.swift */; };
+		1AF00003000000000000000A /* OmacyFrameResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AF00002000000000000000B /* OmacyFrameResources.swift */; };
+		1AE00001000000000000000A /* OmacyEngineSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AE00001000000000000000B /* OmacyEngineSession.swift */; };
+		1AE00002000000000000000A /* OmacyEngineSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AE00001000000000000000B /* OmacyEngineSession.swift */; };
+		1AE00003000000000000000A /* OmacyEngineSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AE00003000000000000000B /* OmacyEngineSessionTests.swift */; };
+		1AA00001000000000000000A /* OmacyAsciiConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AA00001000000000000000B /* OmacyAsciiConverter.swift */; };
+		1AA00002000000000000000A /* OmacyAsciiConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AA00002000000000000000B /* OmacyAsciiConverterTests.swift */; };
+		1AR00005000000000000000A /* OmacyDisplayLinkDriverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AR00003000000000000000B /* OmacyDisplayLinkDriverTests.swift */; };
+		1AR00006000000000000000A /* OmacyPinnedPreviewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AR00004000000000000000B /* OmacyPinnedPreviewState.swift */; };
+		1AR00007000000000000000A /* OmacyPinnedPreviewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AR00004000000000000000B /* OmacyPinnedPreviewState.swift */; };
+		1AR00009000000000000000A /* OmacyTransitionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AR00006000000000000000B /* OmacyTransitionCoordinator.swift */; };
+		1AR0000A000000000000000A /* OmacyTransitionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AR00006000000000000000B /* OmacyTransitionCoordinator.swift */; };
+		1AR00008000000000000000A /* OmacyPinnedPreviewStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AR00005000000000000000B /* OmacyPinnedPreviewStateTests.swift */; };
 		1A0000A2000000000000000A /* OmacyLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000091000000000000000B /* OmacyLayout.swift */; };
 		1A0000A3000000000000000A /* OmacyLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000091000000000000000B /* OmacyLayout.swift */; };
 		1A0000F0000000000000000A /* OmacyFont.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000F0000000000000000B /* OmacyFont.swift */; };
@@ -36,6 +50,10 @@
 		1A0000F3000000000000000A /* OmacyQuads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000F2000000000000000B /* OmacyQuads.swift */; };
 		1A0000A4000000000000000A /* OmacyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000092000000000000000B /* OmacyStore.swift */; };
 		1A0000A5000000000000000A /* OmacyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000092000000000000000B /* OmacyStore.swift */; };
+		1AC10001000000000000000A /* OmacyConfigSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AC10001000000000000000B /* OmacyConfigSchema.swift */; };
+		1AC10002000000000000000A /* OmacyConfigSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AC10001000000000000000B /* OmacyConfigSchema.swift */; };
+		1AC10003000000000000000A /* OmacyConfigRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AC10002000000000000000B /* OmacyConfigRepository.swift */; };
+		1AC10004000000000000000A /* OmacyConfigRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AC10002000000000000000B /* OmacyConfigRepository.swift */; };
 		1A0000A6000000000000000A /* OmacyAtlas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000093000000000000000B /* OmacyAtlas.swift */; };
 		1A0000A7000000000000000A /* OmacyAtlas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000093000000000000000B /* OmacyAtlas.swift */; };
 		1A0000A8000000000000000A /* OmacyShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 1A000094000000000000000B /* OmacyShaders.metal */; };
@@ -60,6 +78,10 @@
 		1A0000E2000000000000000A /* Omacy.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000E2000000000000000B /* Omacy.icon */; };
 		1A000080000000000000000A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 1A000085000000000000000B /* Sparkle */; };
 		1A000082000000000000000A /* SparkleUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000083000000000000000B /* SparkleUpdater.swift */; };
+		1AT00001000000000000000A /* OmacyLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AT00001000000000000000B /* OmacyLayoutTests.swift */; };
+		1AT00002000000000000000A /* OmacyQuadsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AT00002000000000000000B /* OmacyQuadsTests.swift */; };
+		1AT00003000000000000000A /* OmacySettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AT00003000000000000000B /* OmacySettingsTests.swift */; };
+		1AF00001000000000000000A /* OmacyFrameResourcesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AF00001000000000000000B /* OmacyFrameResourcesTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,6 +91,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 1A000010000000000000000A;
 			remoteInfo = OmacyScreensaver;
+		};
+		1AT00009000000000000000A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1A000000000000000000000A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1A00001A000000000000000A;
+			remoteInfo = Omacy;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -107,15 +136,23 @@
 		1A000088000000000000000B /* thumbnail@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "thumbnail@2x.png"; sourceTree = "<group>"; };
 		1A000032000000000000000B /* PluginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginManager.swift; sourceTree = "<group>"; };
 		1A000050000000000000000B /* BuildNumber.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = BuildNumber.xcconfig; sourceTree = "<group>"; };
-		1A000060000000000000000B /* OmacyCanaryAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyCanaryAnimator.swift; sourceTree = "<group>"; };
-		1A000062000000000000000B /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
 		1A000063000000000000000B /* PreviewViewRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewViewRepresentable.swift; sourceTree = "<group>"; };
 		1A000064000000000000000B /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		1A000090000000000000000B /* OmacyRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyRenderer.swift; sourceTree = "<group>"; };
+		1AR00001000000000000000B /* OmacyMetalGridRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyMetalGridRenderer.swift; sourceTree = "<group>"; };
+		1AR00002000000000000000B /* OmacyDisplayLinkDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyDisplayLinkDriver.swift; sourceTree = "<group>"; };
+		1AR00003000000000000000B /* OmacyDisplayLinkDriverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyDisplayLinkDriverTests.swift; sourceTree = "<group>"; };
+		1AR00004000000000000000B /* OmacyPinnedPreviewState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyPinnedPreviewState.swift; sourceTree = "<group>"; };
+		1AR00005000000000000000B /* OmacyPinnedPreviewStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyPinnedPreviewStateTests.swift; sourceTree = "<group>"; };
+		1AR00006000000000000000B /* OmacyTransitionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyTransitionCoordinator.swift; sourceTree = "<group>"; };
+		1AF00002000000000000000B /* OmacyFrameResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyFrameResources.swift; sourceTree = "<group>"; };
+		1AE00001000000000000000B /* OmacyEngineSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyEngineSession.swift; sourceTree = "<group>"; };
 		1A000091000000000000000B /* OmacyLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyLayout.swift; sourceTree = "<group>"; };
 		1A0000F0000000000000000B /* OmacyFont.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyFont.swift; sourceTree = "<group>"; };
 		1A0000F2000000000000000B /* OmacyQuads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyQuads.swift; sourceTree = "<group>"; };
 		1A000092000000000000000B /* OmacyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyStore.swift; sourceTree = "<group>"; };
+		1AC10001000000000000000B /* OmacyConfigSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyConfigSchema.swift; sourceTree = "<group>"; };
+		1AC10002000000000000000B /* OmacyConfigRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyConfigRepository.swift; sourceTree = "<group>"; };
 		1A000093000000000000000B /* OmacyAtlas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyAtlas.swift; sourceTree = "<group>"; };
 		1A000094000000000000000B /* OmacyShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = OmacyShaders.metal; sourceTree = "<group>"; };
 		1A000095000000000000000B /* OmacyHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyHostView.swift; sourceTree = "<group>"; };
@@ -132,6 +169,14 @@
 		1A0000E0000000000000000B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1A0000E2000000000000000B /* Omacy.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = Omacy.icon; path = ../../assets/Omacy.icon; sourceTree = SOURCE_ROOT; };
 		1A000083000000000000000B /* SparkleUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparkleUpdater.swift; sourceTree = "<group>"; };
+		1AT00000000000000000000B /* OmacyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OmacyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1AT00001000000000000000B /* OmacyLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyLayoutTests.swift; sourceTree = "<group>"; };
+		1AT00002000000000000000B /* OmacyQuadsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyQuadsTests.swift; sourceTree = "<group>"; };
+		1AT00003000000000000000B /* OmacySettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacySettingsTests.swift; sourceTree = "<group>"; };
+		1AF00001000000000000000B /* OmacyFrameResourcesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyFrameResourcesTests.swift; sourceTree = "<group>"; };
+		1AE00003000000000000000B /* OmacyEngineSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyEngineSessionTests.swift; sourceTree = "<group>"; };
+		1AA00001000000000000000B /* OmacyAsciiConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyAsciiConverter.swift; sourceTree = "<group>"; };
+		1AA00002000000000000000B /* OmacyAsciiConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyAsciiConverterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -156,6 +201,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		1AT00005000000000000000A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -166,6 +218,7 @@
 				1A000015000000000000000C /* Omacy */,
 				1A000016000000000000000C /* OmacyScreensaver */,
 				1A0000C0000000000000000C /* Shared */,
+				1AT00000000000000000000C /* OmacyTests */,
 				1A000017000000000000000C /* Frameworks */,
 				1A000018000000000000000C /* Products */,
 			);
@@ -183,7 +236,6 @@
 				1A000096000000000000000B /* ConfigView.swift */,
 				1A0000C2000000000000000B /* ArtEditor.swift */,
 				1A0000D2000000000000000B /* ArtShuffle.swift */,
-				1A000062000000000000000B /* PreviewView.swift */,
 				1A000063000000000000000B /* PreviewViewRepresentable.swift */,
 				1A00009C000000000000000B /* Omacy-Bridging-Header.h */,
 				1A0000E0000000000000000B /* Assets.xcassets */,
@@ -223,12 +275,21 @@
 		1A0000C0000000000000000C /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				1AA00001000000000000000B /* OmacyAsciiConverter.swift */,
 				1A00009D000000000000000B /* OmacyCanaryAnimator.swift */,
 				1A000090000000000000000B /* OmacyRenderer.swift */,
+				1AR00001000000000000000B /* OmacyMetalGridRenderer.swift */,
+				1AR00002000000000000000B /* OmacyDisplayLinkDriver.swift */,
+				1AR00004000000000000000B /* OmacyPinnedPreviewState.swift */,
+				1AR00006000000000000000B /* OmacyTransitionCoordinator.swift */,
+				1AF00002000000000000000B /* OmacyFrameResources.swift */,
+				1AE00001000000000000000B /* OmacyEngineSession.swift */,
 				1A000091000000000000000B /* OmacyLayout.swift */,
 				1A0000F0000000000000000B /* OmacyFont.swift */,
 				1A0000F2000000000000000B /* OmacyQuads.swift */,
 				1A000092000000000000000B /* OmacyStore.swift */,
+				1AC10001000000000000000B /* OmacyConfigSchema.swift */,
+				1AC10002000000000000000B /* OmacyConfigRepository.swift */,
 				1A000093000000000000000B /* OmacyAtlas.swift */,
 				1A000094000000000000000B /* OmacyShaders.metal */,
 				1A000097000000000000000B /* FairfaxHD.ttf */,
@@ -236,6 +297,21 @@
 				1A000099000000000000000B /* OFL.txt */,
 			);
 			path = Shared;
+			sourceTree = "<group>";
+		};
+		1AT00000000000000000000C /* OmacyTests */ = {
+			isa = PBXGroup;
+			children = (
+				1AA00002000000000000000B /* OmacyAsciiConverterTests.swift */,
+				1AR00003000000000000000B /* OmacyDisplayLinkDriverTests.swift */,
+				1AR00005000000000000000B /* OmacyPinnedPreviewStateTests.swift */,
+				1AT00001000000000000000B /* OmacyLayoutTests.swift */,
+				1AT00002000000000000000B /* OmacyQuadsTests.swift */,
+				1AT00003000000000000000B /* OmacySettingsTests.swift */,
+				1AF00001000000000000000B /* OmacyFrameResourcesTests.swift */,
+				1AE00003000000000000000B /* OmacyEngineSessionTests.swift */,
+			);
+			path = OmacyTests;
 			sourceTree = "<group>";
 		};
 		1A000017000000000000000C /* Frameworks */ = {
@@ -253,6 +329,7 @@
 			children = (
 				1A00000C000000000000000B /* Omacy.app */,
 				1A000007000000000000000B /* OmacyScreensaver.appex */,
+				1AT00000000000000000000B /* OmacyTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -310,6 +387,23 @@
 			productReference = 1A00000C000000000000000B /* Omacy.app */;
 			productType = "com.apple.product-type.application";
 		};
+		1AT00006000000000000000A /* OmacyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1AT0000C0000000000000000A /* Build configuration list for PBXNativeTarget "OmacyTests" */;
+			buildPhases = (
+				1AT00004000000000000000A /* Sources */,
+				1AT00005000000000000000A /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1AT0000A0000000000000000A /* PBXTargetDependency */,
+			);
+			name = OmacyTests;
+			productName = OmacyTests;
+			productReference = 1AT00000000000000000000B /* OmacyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -347,6 +441,7 @@
 			targets = (
 				1A00001A000000000000000A /* Omacy */,
 				1A000010000000000000000A /* OmacyScreensaver */,
+				1AT00006000000000000000A /* OmacyTests */,
 			);
 		};
 /* End PBXProject section */
@@ -421,27 +516,50 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		1AT00004000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1AA00002000000000000000A /* OmacyAsciiConverterTests.swift in Sources */,
+				1AT00001000000000000000A /* OmacyLayoutTests.swift in Sources */,
+				1AT00002000000000000000A /* OmacyQuadsTests.swift in Sources */,
+				1AT00003000000000000000A /* OmacySettingsTests.swift in Sources */,
+				1AF00001000000000000000A /* OmacyFrameResourcesTests.swift in Sources */,
+				1AE00003000000000000000A /* OmacyEngineSessionTests.swift in Sources */,
+				1AR00005000000000000000A /* OmacyDisplayLinkDriverTests.swift in Sources */,
+				1AR00008000000000000000A /* OmacyPinnedPreviewStateTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		1A00001C000000000000000A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1AA00001000000000000000A /* OmacyAsciiConverter.swift in Sources */,
 				1A000001000000000000000A /* OmacyApp.swift in Sources */,
 				1A000082000000000000000A /* SparkleUpdater.swift in Sources */,
 				1A000002000000000000000A /* ContentView.swift in Sources */,
 				1A000032000000000000000A /* PluginManager.swift in Sources */,
 				1A000066000000000000000A /* Logger.swift in Sources */,
 				1A0000A0000000000000000A /* OmacyRenderer.swift in Sources */,
+				1AR00001000000000000000A /* OmacyMetalGridRenderer.swift in Sources */,
+				1AR00003000000000000000A /* OmacyDisplayLinkDriver.swift in Sources */,
+				1AR00006000000000000000A /* OmacyPinnedPreviewState.swift in Sources */,
+				1AR00009000000000000000A /* OmacyTransitionCoordinator.swift in Sources */,
+				1AF00002000000000000000A /* OmacyFrameResources.swift in Sources */,
+				1AE00001000000000000000A /* OmacyEngineSession.swift in Sources */,
 				1A0000A2000000000000000A /* OmacyLayout.swift in Sources */,
 				1A0000F0000000000000000A /* OmacyFont.swift in Sources */,
 				1A0000F2000000000000000A /* OmacyQuads.swift in Sources */,
 				1A0000A4000000000000000A /* OmacyStore.swift in Sources */,
+				1AC10001000000000000000A /* OmacyConfigSchema.swift in Sources */,
+				1AC10003000000000000000A /* OmacyConfigRepository.swift in Sources */,
 				1A0000A6000000000000000A /* OmacyAtlas.swift in Sources */,
 				1A0000A8000000000000000A /* OmacyShaders.metal in Sources */,
 				1A0000AA000000000000000A /* OmacyHostView.swift in Sources */,
 				1A0000AB000000000000000A /* ConfigView.swift in Sources */,
 				1A0000C2000000000000000A /* ArtEditor.swift in Sources */,
 				1A0000D2000000000000000A /* ArtShuffle.swift in Sources */,
-				1A000062000000000000000A /* PreviewView.swift in Sources */,
 				1A000063000000000000000A /* PreviewViewRepresentable.swift in Sources */,
 				1A0000B6000000000000000A /* OmacyCanaryAnimator.swift in Sources */,
 			);
@@ -458,10 +576,18 @@
 				1A000067000000000000000A /* Logger.swift in Sources */,
 				1A0000B7000000000000000A /* OmacyCanaryAnimator.swift in Sources */,
 				1A0000A1000000000000000A /* OmacyRenderer.swift in Sources */,
+				1AR00002000000000000000A /* OmacyMetalGridRenderer.swift in Sources */,
+				1AR00004000000000000000A /* OmacyDisplayLinkDriver.swift in Sources */,
+				1AR00007000000000000000A /* OmacyPinnedPreviewState.swift in Sources */,
+				1AR0000A000000000000000A /* OmacyTransitionCoordinator.swift in Sources */,
+				1AF00003000000000000000A /* OmacyFrameResources.swift in Sources */,
+				1AE00002000000000000000A /* OmacyEngineSession.swift in Sources */,
 				1A0000A3000000000000000A /* OmacyLayout.swift in Sources */,
 				1A0000F1000000000000000A /* OmacyFont.swift in Sources */,
 				1A0000F3000000000000000A /* OmacyQuads.swift in Sources */,
 				1A0000A5000000000000000A /* OmacyStore.swift in Sources */,
+				1AC10002000000000000000A /* OmacyConfigSchema.swift in Sources */,
+				1AC10004000000000000000A /* OmacyConfigRepository.swift in Sources */,
 				1A0000A7000000000000000A /* OmacyAtlas.swift in Sources */,
 				1A0000A9000000000000000A /* OmacyShaders.metal in Sources */,
 			);
@@ -470,6 +596,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		1AT0000A0000000000000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1A00001A000000000000000A /* Omacy */;
+			targetProxy = 1AT00009000000000000000A /* PBXContainerItemProxy */;
+		};
 		1A00001E000000000000000A /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 1A000010000000000000000A /* OmacyScreensaver */;
@@ -478,10 +609,43 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		1AT0000D0000000000000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 25TVW8MSGJ;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/../../crates/omacy-engine/include";
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = be.zenjoy.omacy.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Omacy.app/Contents/MacOS/Omacy";
+			};
+			name = Debug;
+		};
+		1AT0000E0000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 25TVW8MSGJ;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/../../crates/omacy-engine/include";
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = be.zenjoy.omacy.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Omacy.app/Contents/MacOS/Omacy";
+			};
+			name = Release;
+		};
 		1A000023000000000000000A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1A000050000000000000000B /* BuildNumber.xcconfig */;
 			buildSettings = {
+				ARCHS = arm64;
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -535,7 +699,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
-				ONLY_ACTIVE_ARCH = YES;
+				ONLY_ACTIVE_ARCH = NO;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -546,6 +710,8 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1A000050000000000000000B /* BuildNumber.xcconfig */;
 			buildSettings = {
+				ARCHS = arm64;
+				ONLY_ACTIVE_ARCH = NO;
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -815,6 +981,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		1AT0000C0000000000000000A /* Build configuration list for PBXNativeTarget "OmacyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1AT0000D0000000000000000A /* Debug */,
+				1AT0000E0000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		1A00001B000000000000000A /* Build configuration list for PBXNativeTarget "Omacy" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

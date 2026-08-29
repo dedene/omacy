@@ -1,5 +1,5 @@
-use omacy_engine::abi::{OmacyAsciiConfig, OMACY_ASCII_BLOCK, OMACY_ASCII_BRAILLE};
-use omacy_engine::ascii::ascii_from_bytes;
+use crate::abi::{OmacyAsciiConfig, OMACY_ASCII_BLOCK, OMACY_ASCII_BRAILLE};
+use crate::ascii::ascii_from_bytes;
 
 fn solid_png(w: u32, h: u32, rgba: [u8; 4]) -> Vec<u8> {
     let mut img = image::RgbaImage::from_pixel(w, h, image::Rgba(rgba));
@@ -62,7 +62,7 @@ fn oversized_svg_is_limit() {
         _pad: 0,
     };
     match ascii_from_bytes(cfg, &huge) {
-        Err(omacy_engine::EngineError::Limit(_)) => {}
+        Err(crate::status::EngineError::Limit(_)) => {}
         other => panic!("expected limit, got {other:?}"),
     }
 }

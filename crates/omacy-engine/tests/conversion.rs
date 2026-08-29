@@ -1,7 +1,7 @@
 //! Identity vs committed conversion goldens.
 
-use omacy_engine::abi::{OmacyAsciiConfig, OMACY_ASCII_BLOCK, OMACY_ASCII_BRAILLE};
-use omacy_engine::ascii::ascii_from_bytes;
+use crate::abi::{OmacyAsciiConfig, OMACY_ASCII_BLOCK, OMACY_ASCII_BRAILLE};
+use crate::ascii::ascii_from_bytes;
 
 struct Case {
     input: &'static str,

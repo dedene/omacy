@@ -1,0 +1,413 @@
+diff --git a/src/effects/mod.rs b/src/effects/mod.rs
+index 1b71bbc..c4a79c1 100644
+--- a/src/effects/mod.rs
++++ b/src/effects/mod.rs
+@@ -40,9 +40,10 @@ pub mod vhstape;
+ pub mod waves;
+ pub mod wipe;
+ 
+-use clap::Subcommand;
++use clap::{Parser, Subcommand};
+ 
+ use crate::engine::effect::Effect;
++use crate::cli::Cli;
+ 
+ #[derive(Subcommand, Debug, Clone)]
+ pub enum EffectCommand {
+@@ -206,4 +207,50 @@ impl EffectCommand {
+             EffectCommand::Wipe(_) => "wipe",
+         }
+     }
++
++    /// Construct an effect from its registry name using struct/Clap defaults.
++    pub fn from_name(name: &str) -> Option<Box<dyn Effect>> {
++        let cli = Cli::try_parse_from(["ttfx", name]).ok()?;
++        Some(cli.effect?.build_effect())
++    }
++
++    pub const NAMES: &'static [&'static str] = &[
++        "beams",
++        "binarypath",
++        "blackhole",
++        "bouncyballs",
++        "bubbles",
++        "burn",
++        "colorshift",
++        "crumble",
++        "decrypt",
++        "errorcorrect",
++        "expand",
++        "fireworks",
++        "highlight",
++        "laseretch",
++        "matrix",
++        "middleout",
++        "orbittingvolley",
++        "overflow",
++        "pour",
++        "print",
++        "rain",
++        "randomsequence",
++        "rings",
++        "scattered",
++        "slice",
++        "slide",
++        "smoke",
++        "spotlights",
++        "spray",
++        "swarm",
++        "sweep",
++        "synthgrid",
++        "thunderstorm",
++        "unstable",
++        "vhstape",
++        "waves",
++        "wipe",
++    ];
+ }
+diff --git a/src/engine/ctx.rs b/src/engine/ctx.rs
+index 261402f..258ba1c 100644
+--- a/src/engine/ctx.rs
++++ b/src/engine/ctx.rs
+@@ -100,6 +100,8 @@ pub struct EngineCtx {
+     pub preexisting_colors_present: bool,
+     /// When Some, every event emission appends a trace line (test harness).
+     pub event_log: Option<Vec<String>>,
++    /// Skip ANSI assembly in [`Self::frame`]. GUI callers still advance the clock.
++    pub suppress_ansi: bool,
+ }
+ 
+ impl EngineCtx {
+@@ -117,6 +119,7 @@ impl EngineCtx {
+             active_character_scratch: Vec::new(),
+             preexisting_colors_present,
+             event_log: None,
++            suppress_ansi: false,
+         })
+     }
+ 
+@@ -695,10 +698,18 @@ impl EngineCtx {
+     /// BaseEffectIterator.frame: enforce framerate (real clock only), then the
+     /// formatted output string; advances the virtual clock by one frame.
+     pub fn frame(&mut self) -> String {
+-        if matches!(self.clock, Clock::Real { .. }) && self.terminal.config.frame_rate != 0 {
++        if !self.suppress_ansi
++            && matches!(self.clock, Clock::Real { .. })
++            && self.terminal.config.frame_rate != 0
++        {
+             self.terminal.enforce_framerate();
+         }
+         self.clock.advance_frame();
+-        self.terminal.get_formatted_output_string()
++        if self.suppress_ansi {
++            self.terminal.snapshot_present_grid();
++            String::new()
++        } else {
++            self.terminal.get_formatted_output_string()
++        }
+     }
+ }
+diff --git a/src/engine/effect.rs b/src/engine/effect.rs
+index ba03700..9dbc86f 100644
+--- a/src/engine/effect.rs
++++ b/src/engine/effect.rs
+@@ -11,6 +11,16 @@ use crate::engine::error::EngineError;
+ pub trait Effect: EffectHooks {
+     fn build(&mut self, ctx: &mut EngineCtx) -> Result<(), EngineError>;
+     fn next_frame(&mut self, ctx: &mut EngineCtx) -> Option<String>;
++
++    /// Tick one simulation step without assembling an ANSI frame.
++    /// `next_frame` remains `advance` plus `get_formatted_output_string`.
++    fn advance(&mut self, ctx: &mut EngineCtx) -> bool {
++        let previous = ctx.suppress_ansi;
++        ctx.suppress_ansi = true;
++        let going = self.next_frame(ctx).is_some();
++        ctx.suppress_ansi = previous;
++        going
++    }
+ }
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+diff --git a/src/engine/mod.rs b/src/engine/mod.rs
+index 195ce25..f716b26 100644
+--- a/src/engine/mod.rs
++++ b/src/engine/mod.rs
+@@ -10,3 +10,5 @@ pub mod input;
+ pub mod motion;
+ pub mod particles;
+ pub mod terminal;
++
++pub use terminal::{PackedCell, CELL_HAS_BACKGROUND, CELL_HAS_GLYPH};
+diff --git a/src/engine/terminal.rs b/src/engine/terminal.rs
+index e21c2ea..fc3b57e 100644
+--- a/src/engine/terminal.rs
++++ b/src/engine/terminal.rs
+@@ -19,6 +19,27 @@ use crate::utils::rng::Rng;
+ const EMPTY_RENDER_CELL: u32 = u32::MAX;
+ const NOT_VISIBLE: usize = usize::MAX;
+ 
++pub const CELL_HAS_BACKGROUND: u8 = 1;
++pub const CELL_HAS_GLYPH: u8 = 2;
++
++/// Packed ABI cell. Layout matches OmacyCell (16 bytes, align 4).
++#[repr(C)]
++#[derive(Clone, Copy, Debug, Default)]
++pub struct PackedCell {
++    pub glyph: u32,
++    pub fg_r: u8,
++    pub fg_g: u8,
++    pub fg_b: u8,
++    pub fg_a: u8,
++    pub bg_r: u8,
++    pub bg_g: u8,
++    pub bg_b: u8,
++    pub bg_a: u8,
++    pub flags: u8,
++    pub occupancy: u8,
++    pub _pad: [u8; 2],
++}
++
+ #[derive(Debug, Clone)]
+ pub struct TerminalConfig {
+     pub tab_width: i64,
+@@ -60,6 +81,22 @@ impl Default for TerminalConfig {
+     }
+ }
+ 
++impl TerminalConfig {
++    /// GUI construction: explicit canvas, centered text, no tty pacing.
++    pub fn gui(width: i64, height: i64, background: Color) -> Self {
++        TerminalConfig {
++            canvas_width: width,
++            canvas_height: height,
++            ignore_terminal_dimensions: true,
++            anchor_canvas: Anchor::C,
++            anchor_text: Anchor::C,
++            frame_rate: 0,
++            terminal_background_color: background,
++            ..Self::default()
++        }
++    }
++}
++
+ /// CharacterSort (argutils.CharacterSort).
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+ pub enum CharacterSort {
+@@ -141,6 +178,13 @@ pub struct Terminal {
+     move_cursor_to_top: String,
+     frame_rate: i64,
+     last_time_printed: Instant,
++    /// Packed cells captured at the last `frame()` / ANSI emit.
++    /// Effects such as `unstable` restore coordinates after `ctx.frame()`, so
++    /// a later live pack would miss the displayed rumble offset.
++    grid_snapshot: Vec<PackedCell>,
++    snapshot_width: usize,
++    snapshot_height: usize,
++    has_snapshot: bool,
+ }
+ 
+ fn ordered_buckets(
+@@ -170,6 +214,65 @@ fn ordered_buckets(
+     buckets.into_iter().filter(|bucket| !bucket.is_empty()).collect()
+ }
+ 
++fn pack_render_cells_into(
++    arena: &[EffectCharacter],
++    render_cells: &[u32],
++    out: &mut [PackedCell],
++    term_bg: [u8; 3],
++    width: usize,
++    height: usize,
++) {
++    const DEFAULT_INK: [u8; 3] = [255, 255, 255];
++    for internal_row in 0..height {
++        let abi_row = height - 1 - internal_row;
++        for col in 0..width {
++            let dst = &mut out[abi_row * width + col];
++            *dst = PackedCell::default();
++            let cell = render_cells[internal_row * width + col];
++            if cell == EMPTY_RENDER_CELL {
++                continue;
++            }
++            let vis = &arena[cell as usize].animation.current_character_visual;
++            let ink = vis
++                .fg_color_code
++                .as_ref()
++                .map(crate::utils::ansi::ColorCode::rgb)
++                .map(|(r, g, b)| [r, g, b])
++                .unwrap_or(DEFAULT_INK);
++            let orig_bg = vis
++                .bg_color_code
++                .as_ref()
++                .map(crate::utils::ansi::ColorCode::rgb)
++                .map(|(r, g, b)| [r, g, b]);
++
++            let (fg, bg, has_background) = if vis.reverse {
++                (orig_bg.unwrap_or(term_bg), Some(ink), true)
++            } else {
++                (ink, orig_bg, orig_bg.is_some())
++            };
++
++            if has_background {
++                let [r, g, b] = bg.expect("reverse always supplies a background");
++                dst.occupancy |= CELL_HAS_BACKGROUND;
++                dst.bg_r = r;
++                dst.bg_g = g;
++                dst.bg_b = b;
++                dst.bg_a = 255;
++            }
++
++            let glyph = vis.symbol.chars().next().filter(|&c| c != ' ' && c != '\0');
++            if let Some(ch) = glyph {
++                dst.occupancy |= CELL_HAS_GLYPH;
++                dst.glyph = ch as u32;
++                dst.fg_r = fg[0];
++                dst.fg_g = fg[1];
++                dst.fg_b = fg[2];
++                dst.fg_a = 255;
++            }
++        }
++    }
++}
++
+ impl Terminal {
+     pub fn new(input_data: &str, config: TerminalConfig) -> Result<Self, EngineError> {
+         let input_data = if input_data.is_empty() { "No Input." } else { input_data };
+@@ -249,6 +352,10 @@ impl Terminal {
+             move_cursor_to_top,
+             frame_rate,
+             last_time_printed: Instant::now(),
++            grid_snapshot: Vec::new(),
++            snapshot_width: 0,
++            snapshot_height: 0,
++            has_snapshot: false,
+         };
+         terminal.make_fill_characters();
+         terminal.setup_character_neighbors();
+@@ -548,6 +655,73 @@ impl Terminal {
+         (width, height)
+     }
+ 
++    fn term_bg_rgb(&self) -> [u8; 3] {
++        let (r, g, b) = self.config.terminal_background_color.rgb_ints();
++        [r, g, b]
++    }
++
++    /// Pack the current `render_cells` (must already be up to date).
++    fn pack_render_cells(&self, out: &mut [PackedCell], term_bg: [u8; 3], width: usize, height: usize) {
++        pack_render_cells_into(&self.arena, &self.render_cells, out, term_bg, width, height);
++    }
++
++    fn store_snapshot(&mut self, width: usize, height: usize) {
++        let needed = width
++            .checked_mul(height)
++            .expect("terminal canvas is too large");
++        let term_bg = self.term_bg_rgb();
++        self.grid_snapshot.resize(needed, PackedCell::default());
++        pack_render_cells_into(
++            &self.arena,
++            &self.render_cells,
++            &mut self.grid_snapshot,
++            term_bg,
++            width,
++            height,
++        );
++        self.snapshot_width = width;
++        self.snapshot_height = height;
++        self.has_snapshot = true;
++    }
++
++    /// Capture occupancy at the same instant ANSI would emit.
++    /// GUI `advance` sets `suppress_ansi` but still needs this snapshot.
++    pub fn snapshot_present_grid(&mut self) {
++        let (width, height) = self.update_render_cells();
++        self.store_snapshot(width, height);
++    }
++
++    /// Paint occupancy + glyph + RGBA with reverse already resolved.
++    /// Origin is top-left; internal south-west rows are remapped.
++    ///
++    /// After `frame()` / `get_formatted_output_string`, copies the snapshot
++    /// taken at emit time so post-frame coordinate restores (e.g. unstable
++    /// rumble) cannot desync Metal from the ANSI oracle.
++    pub fn fill_grid(&mut self, out: &mut [PackedCell], term_bg: [u8; 3]) -> (usize, usize) {
++        if self.has_snapshot {
++            let needed = self
++                .snapshot_width
++                .checked_mul(self.snapshot_height)
++                .expect("terminal canvas is too large");
++            assert!(
++                out.len() >= needed,
++                "fill_grid buffer is smaller than the canvas"
++            );
++            out[..needed].copy_from_slice(&self.grid_snapshot);
++            return (self.snapshot_width, self.snapshot_height);
++        }
++        let (width, height) = self.update_render_cells();
++        let needed = width
++            .checked_mul(height)
++            .expect("terminal canvas is too large");
++        assert!(
++            out.len() >= needed,
++            "fill_grid buffer is smaller than the canvas"
++        );
++        self.pack_render_cells(out, term_bg, width, height);
++        (width, height)
++    }
++
+     /// Terminal._update_terminal_state: materialize the row-oriented state
+     /// exposed by the upstream API. Frame output uses the cell buffer directly
+     /// so the hot path does not copy every rendered byte through these rows.
+@@ -575,6 +749,7 @@ impl Terminal {
+     /// get_formatted_output_string: refresh + emit top row first.
+     pub fn get_formatted_output_string(&mut self) -> String {
+         let (width, height) = self.update_render_cells();
++        self.store_snapshot(width, height);
+         let minimum_capacity = width
+             .checked_mul(height)
+             .and_then(|cells| cells.checked_add(height.saturating_sub(1)))
+diff --git a/src/utils/ansi.rs b/src/utils/ansi.rs
+index 328d91d..39a06d6 100644
+--- a/src/utils/ansi.rs
++++ b/src/utils/ansi.rs
+@@ -33,6 +33,28 @@ pub enum ColorCode {
+     Xterm(u8),
+ }
+ 
++impl ColorCode {
++    /// RGB bytes this code would emit. Xterm indexes use hexterm's palette.
++    pub fn rgb(&self) -> (u8, u8, u8) {
++        match self {
++            ColorCode::Rgb(hex) => parse_rgb_hex(hex),
++            ColorCode::Xterm(n) => parse_rgb_hex(crate::utils::hexterm::xterm_to_hex(*n)),
++        }
++    }
++}
++
++fn parse_rgb_hex(hex: &str) -> (u8, u8, u8) {
++    let s = hex.trim_matches('#');
++    if s.len() < 6 {
++        return (0, 0, 0);
++    }
++    (
++        u8::from_str_radix(&s[0..2], 16).unwrap_or(0),
++        u8::from_str_radix(&s[2..4], 16).unwrap_or(0),
++        u8::from_str_radix(&s[4..6], 16).unwrap_or(0),
++    )
++}
++
+ /// Decimal digits of a byte, without going through core::fmt. Every restyled
+ /// character reassembles its SGR sequence, so the formatting machinery shows up
+ /// in profiles.
+diff --git a/src/utils/rng.rs b/src/utils/rng.rs
+index 0b88ae5..6061f4d 100644
+--- a/src/utils/rng.rs
++++ b/src/utils/rng.rs
+@@ -6,6 +6,7 @@
+ //! sequences given the same seed (plan.md §7). Do not change any helper's
+ //! algorithm without updating the shim in lockstep.
+ 
++#[derive(Clone)]
+ pub struct Rng {
+     s: [u64; 4],
+ }

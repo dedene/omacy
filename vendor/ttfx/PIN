@@ -1,9 +1,20 @@
-7203e354498462064b7c0a89375051f65cf2ce99
+upstream_repository=https://github.com/omacom-io/ttfx.git
+upstream_tag=v0.3.2
+upstream_commit=7203e354498462064b7c0a89375051f65cf2ce99
+imported_at=2026-08-27
 
-Patches (engine seams only; no effect-file forks):
+# ttfx is a Rust port pinned to this TerminalTextEffects release.
+tte_repository=https://github.com/ChrisBuilds/terminaltexteffects.git
+tte_tag=v0.15.0
+tte_commit=7a91dd9ca6ee0c4f4b1484efee0ecac1bb84104e
 
-- Terminal::fill_grid + present-grid snapshot at frame()/ANSI emit
-- TerminalConfig::gui()
-- EngineCtx.suppress_ansi
-- Effect::advance default method
-- EffectCommand::from_name
+# Only these upstream ttfx paths may differ in the checked-in snapshot.
+# Individual effect implementations under src/effects/*.rs are forbidden.
+local_patch=../patches/ttfx-omacy.patch
+allow=src/effects/mod.rs
+allow=src/engine/ctx.rs
+allow=src/engine/effect.rs
+allow=src/engine/mod.rs
+allow=src/engine/terminal.rs
+allow=src/utils/ansi.rs
+allow=src/utils/rng.rs

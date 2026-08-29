@@ -1,5 +1,6 @@
 [workspace]
-members = ["crates/omacy-engine"]
+members = ["crates/omacy-engine", "tools/xtask"]
+exclude = ["vendor/ttfx"]
 resolver = "2"
 
 [workspace.package]

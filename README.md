@@ -27,8 +27,8 @@ https://github.com/user-attachments/assets/951bc333-f338-47a5-9001-93e52bb4d379
 
 - **A real screensaver.** Host app plus a `com.apple.screensaver` appex, listed in System Settings. Not a preview window pretending to be idle.
 - **The Omarchy loop.** All 37 Terminal Text Effects, running on a Metal cell grid. Same motion as the Linux screensaver, including the default wordmark.
-- **Your art.** Paste ASCII, or convert a PNG or SVG to block or Braille. Restore the default whenever you want.
-- **Install from the host.** Drop `Omacy.app` in `/Applications`, register the extension, enable it. Configuration lives in the app because the converter needs `NSOpenPanel`.
+- **Your art.** Paste ASCII, convert a PNG or SVG to block or Braille, or let an agent write the public text file directly.
+- **Install from the host.** Drop `Omacy.app` in `/Applications`, register the extension, enable it. The full configuration editor lives in the app because the converter needs `NSOpenPanel`.
 
 See [architecture](docs/architecture.md), [FFI](docs/ffi.md), and [parity](docs/parity.md) for the engine contract.
 
@@ -46,7 +46,7 @@ The host will not register the extension from a random folder. Mixing Xcode Deri
 
 Builds are signed and notarized by Zenjoy BV. Requires macOS 15 (Sequoia) or later.
 
-Once installed, Omacy updates itself from GitHub Releases via [Sparkle](https://sparkle-project.org).
+Once installed, Omacy offers user-approved, signed updates from GitHub Releases via [Sparkle](https://sparkle-project.org).
 
 ## Status
 
@@ -59,27 +59,43 @@ The appex uses ScreenSaver.framework classes Apple has not documented. Aerial do
 ## Requirements
 
 - macOS 15 (Sequoia) or later
+- Apple silicon (`arm64`); Intel and universal builds are not supported
 - Xcode 26 (PaperSaver 0.2.0 needs Swift 6.2)
 - Rust 1.88 (`rust-toolchain.toml`)
+
+## Configuration and agents
+
+Omacy's public configuration is deliberately made of ordinary files:
+
+```text
+~/.config/omacy/screensaver.txt
+~/.config/omacy/settings.json
+```
+
+The host app and your own scripts or agents can write them. The screensaver extension only reads them. Each file is validated independently, with a process-private last-known-good cache in each sandbox and bundled defaults as fallbacks. Changes take effect at the next effect boundary; Omacy does not run a filesystem watcher.
+
+An agent can drive the art by atomically replacing `screensaver.txt` with complete UTF-8 ASCII art. It may also select an effect pool or adjust presentation settings in `settings.json`. See the [agent workflow](docs/agent-configuration.md) and the exact loading, migration, and transition contracts in [architecture](docs/architecture.md).
 
 ## Build
 
 Engine tests:
 
 ```bash
-cargo test -p omacy-engine
+cargo test --workspace --all-targets
+cargo xtask header check
+scripts/verify-ttfx-vendor.sh
 ```
 
 Mac host and screensaver:
 
 ```bash
 xcodebuild -project apps/Omacy/Omacy.xcodeproj -scheme Omacy \
-  -destination 'platform=macOS' build
+  -destination 'generic/platform=macOS' build
 ```
 
 The Xcode build phase runs `apps/Omacy/scripts/build-engine.sh`, which builds `libomacy_engine.a` for `aarch64-apple-darwin` and links it into the app and the appex.
 
-Vendored engine pin: `vendor/ttfx/PIN` is ttfx v0.3.2 (`7203e354498462064b7c0a89375051f65cf2ce99`). Default art is `assets/branding/screensaver.txt`.
+The C header is generated with pinned cbindgen 0.29.4 and committed at `crates/omacy-engine/include/omacy.h`. Vendored engine provenance is recorded in `vendor/ttfx/PIN`; ttfx is a checked-in patched snapshot, not a submodule. Default art is `assets/branding/screensaver.txt`.
 
 Host-specific notes live in [apps/Omacy/README.md](apps/Omacy/README.md). Screensaver appex background is in [apps/Omacy/BACKGROUND.md](apps/Omacy/BACKGROUND.md).
 

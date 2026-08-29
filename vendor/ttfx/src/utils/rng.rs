@@ -6,6 +6,7 @@
 //! sequences given the same seed (plan.md §7). Do not change any helper's
 //! algorithm without updating the shim in lockstep.
 
+#[derive(Clone)]
 pub struct Rng {
     s: [u64; 4],
 }

@@ -1,6 +1,6 @@
 //! Independent SGR decoder. fill_grid must not call this.
 
-use omacy_engine::abi::OmacyCell;
+use crate::abi::OmacyCell;
 use ttfx::engine::terminal::{CELL_HAS_BACKGROUND, CELL_HAS_GLYPH};
 use ttfx::utils::hexterm;
 
@@ -180,6 +180,7 @@ mod tests {
     }
 }
 
+#[allow(dead_code)]
 pub fn occupancy(cell: &OmacyCell) -> (bool, bool) {
     (
         cell.occupancy & CELL_HAS_BACKGROUND != 0,

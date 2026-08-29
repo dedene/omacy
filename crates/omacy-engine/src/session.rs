@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use ttfx::effects::EffectCommand;
 use ttfx::engine::ctx::{Clock, EngineCtx};
 use ttfx::engine::effect::Effect;
@@ -8,16 +6,14 @@ use ttfx::utils::graphics::Color;
 use ttfx::utils::rng::Rng;
 
 use crate::abi::OmacyFrame;
-use crate::content::{
-    is_known_effect, parse_utf8, pick_effect_name, validate_art, validate_effect, Content,
-};
+use crate::content::{parse_utf8, pick_effect_name, validate_art, validate_pool, Content};
 use crate::limits::{self, check_geometry};
-use crate::settings;
 use crate::status::EngineError;
 
 #[derive(Clone, Copy, Debug)]
 pub enum ClockKind {
     Real,
+    #[cfg(test)]
     Virtual60,
 }
 
@@ -34,27 +30,17 @@ pub struct Session {
     state: LiveState,
     selected: Content,
     selected_next: Content,
-    pending: Option<ContentPacket>,
-    pending_geometry: Option<(u32, u32)>,
     cols: u32,
     rows: u32,
     cache: Vec<PackedCell>,
     clear: [u8; 4],
     accumulator: f64,
     generation: u64,
-    config_dir: Option<PathBuf>,
     pick_rng: Rng,
     seed: Option<u64>,
     clock_kind: ClockKind,
     stepping: bool,
     last_error: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct ContentPacket {
-    pub art: Option<String>,
-    pub effect: String,
-    pub bg: [u8; 4],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -68,18 +54,15 @@ impl Session {
     pub fn create(
         art: String,
         effect: String,
+        pool: Vec<String>,
         bg: [u8; 4],
-        config_dir: Option<PathBuf>,
         seed: Option<u64>,
         cols: u32,
         rows: u32,
         clock_kind: ClockKind,
     ) -> Result<Self, EngineError> {
         let (cols, rows) = check_geometry(cols, rows)?;
-        let mut selected = Content::from_parts(art, effect, bg)?;
-        if let Some(dir) = &config_dir {
-            selected.pool = settings::load_pool(dir);
-        }
+        let selected = Content::from_parts(art, effect, pool, bg)?;
         let pick_rng = match seed {
             Some(s) => Rng::seeded(s),
             None => Rng::from_entropy(),
@@ -89,15 +72,12 @@ impl Session {
             state: LiveState::Dead,
             selected: selected.clone(),
             selected_next: selected,
-            pending: None,
-            pending_geometry: None,
             cols,
             rows,
             cache: vec![PackedCell::default(); (cols * rows) as usize],
             clear,
             accumulator: 0.0,
             generation: 0,
-            config_dir,
             pick_rng,
             seed,
             clock_kind,
@@ -143,10 +123,12 @@ impl Session {
         matches!(self.state, LiveState::Dead)
     }
 
+    #[cfg(test)]
     pub fn is_waiting(&self) -> bool {
         matches!(self.state, LiveState::Waiting)
     }
 
+    #[cfg(test)]
     pub fn force_reentrant_step(&mut self) -> Result<StepPublish, EngineError> {
         self.stepping = true;
         let result = self.step(1.0 / 60.0);
@@ -160,73 +142,88 @@ impl Session {
         self.cache.clear();
     }
 
-    pub fn set_pending(&mut self, packet: ContentPacket) -> Result<(), EngineError> {
-        self.require_live()?;
-        validate_effect(&packet.effect)?;
-        if let Some(art) = &packet.art {
-            if !art.is_empty() {
-                validate_art(art)?;
-            }
+    /// Builds a complete next generation before changing any published state.
+    /// On error, content, geometry, frame storage, clear color and generation
+    /// remain untouched.
+    pub fn begin_next_with_config(
+        &mut self,
+        art: String,
+        pool: Vec<String>,
+        cols: u32,
+        rows: u32,
+    ) -> Result<(), EngineError> {
+        self.begin_next_with_config_using(art, pool, cols, rows, construct_effect)
+    }
+
+    fn begin_next_with_config_using<F>(
+        &mut self,
+        art: String,
+        pool: Vec<String>,
+        cols: u32,
+        rows: u32,
+        build: F,
+    ) -> Result<(), EngineError>
+    where
+        F: FnOnce(
+            &Content,
+            u32,
+            u32,
+            Option<u64>,
+            u64,
+            &mut Rng,
+            ClockKind,
+        ) -> Result<(Box<dyn Effect>, EngineCtx), EngineError>,
+    {
+        if !matches!(self.state, LiveState::Waiting) {
+            return Err(EngineError::InvalidArg(
+                "begin_next_with_config is only legal while waiting".into(),
+            ));
         }
-        self.pending = Some(packet);
+        let (cols, rows) = check_geometry(cols, rows)?;
+        validate_art(&art)?;
+        if art.is_empty() {
+            return Err(EngineError::InvalidArg("ASCII art is empty".into()));
+        }
+        validate_pool(&pool)?;
+
+        let candidate = Content {
+            art,
+            effect: "random".into(),
+            bg: self.selected.bg,
+            pool,
+        };
+        let next_generation = self.generation.saturating_add(1);
+        // Candidate selection advances a transactional copy. Failure leaves
+        // the live stream untouched; success promotes the advanced stream.
+        let mut candidate_picker = self.pick_rng.clone();
+        let (effect, ctx) = build(
+            &candidate,
+            cols,
+            rows,
+            self.seed,
+            next_generation,
+            &mut candidate_picker,
+            self.clock_kind,
+        )?;
+        let cache = vec![PackedCell::default(); (cols * rows) as usize];
+        let clear = bg_or_opaque(candidate.bg);
+
+        self.state = LiveState::Running { effect, ctx };
+        self.selected = candidate.clone();
+        self.selected_next = candidate;
+        self.cols = cols;
+        self.rows = rows;
+        self.cache = cache;
+        self.clear = clear;
+        self.accumulator = 0.0;
+        self.generation = next_generation;
+        self.pick_rng = candidate_picker;
         Ok(())
     }
 
-    pub fn resize(&mut self, cols: u32, rows: u32) -> Result<(), EngineError> {
-        self.require_live()?;
-        let (cols, rows) = check_geometry(cols, rows)?;
-        match &self.state {
-            LiveState::Running { .. } => {
-                if (cols, rows) == (self.cols, self.rows) {
-                    self.pending_geometry = None;
-                } else {
-                    self.pending_geometry = Some((cols, rows));
-                }
-                Ok(())
-            }
-            LiveState::Waiting => {
-                self.apply_geometry(cols, rows);
-                Ok(())
-            }
-            LiveState::Dead => Err(EngineError::Dead),
-        }
-    }
-
-    fn apply_geometry(&mut self, cols: u32, rows: u32) {
-        self.cols = cols;
-        self.rows = rows;
-        self.pending_geometry = None;
-        self.cache = vec![PackedCell::default(); (cols * rows) as usize];
-    }
-
-    pub fn begin_next(&mut self) -> Result<(), EngineError> {
-        if !matches!(self.state, LiveState::Waiting) {
-            return Err(EngineError::InvalidArg(
-                "begin_next is only legal while waiting".into(),
-            ));
-        }
-        let previous_geom = (self.cols, self.rows);
-        let previous_pending = self.pending_geometry;
-        let previous_cache = self.cache.clone();
-        let previous_clear = self.clear;
-        if let Some((cols, rows)) = self.pending_geometry {
-            self.apply_geometry(cols, rows);
-        }
-        match self.install_effect() {
-            Ok(()) => {
-                self.generation = self.generation.saturating_add(1);
-                Ok(())
-            }
-            Err(e) => {
-                self.cols = previous_geom.0;
-                self.rows = previous_geom.1;
-                self.pending_geometry = previous_pending;
-                self.cache = previous_cache;
-                self.clear = previous_clear;
-                self.state = LiveState::Waiting;
-                Err(e)
-            }
-        }
+    #[cfg(test)]
+    pub fn selected_effect_pool(&self) -> &[String] {
+        &self.selected.pool
     }
 
     pub fn step(&mut self, elapsed: f64) -> Result<StepPublish, EngineError> {
@@ -291,7 +288,7 @@ impl Session {
 
         if ended {
             self.accumulator = 0.0;
-            self.apply_boundary_content();
+            self.selected_next = self.selected.clone();
             self.state = LiveState::Waiting;
             return Ok((true, steps_taken));
         }
@@ -317,33 +314,6 @@ impl Session {
         }
     }
 
-    fn apply_boundary_content(&mut self) {
-        if let Some(packet) = self.pending.take() {
-            let mut next = self.selected.clone();
-            if let Some(art) = packet.art {
-                if !art.is_empty() {
-                    next.art = art;
-                }
-            }
-            next.effect = packet.effect;
-            next.bg = packet.bg;
-            if next.effect == "random" {
-                if let Some(dir) = &self.config_dir {
-                    next.pool = settings::load_pool(dir);
-                }
-            } else {
-                next.pool.clear();
-            }
-            self.selected_next = next;
-            return;
-        }
-        if let Some(dir) = &self.config_dir {
-            self.selected_next = settings::load_from_dir(dir, &self.selected);
-            return;
-        }
-        self.selected_next = self.selected.clone();
-    }
-
     fn require_live(&self) -> Result<(), EngineError> {
         match self.state {
             LiveState::Dead => Err(EngineError::Dead),
@@ -367,6 +337,232 @@ impl Session {
             _pad: 0,
             cells,
         }
+    }
+}
+
+#[cfg(test)]
+mod atomic_tests {
+    use super::*;
+
+    fn build_after_recording_selection(
+        content: &Content,
+        cols: u32,
+        rows: u32,
+        seed: Option<u64>,
+        generation: u64,
+        picker: &mut Rng,
+        clock_kind: ClockKind,
+        selected: &mut Option<String>,
+    ) -> Result<(Box<dyn Effect>, EngineCtx), EngineError> {
+        let name = pick_effect_name(&content.effect, &content.pool, picker).to_string();
+        *selected = Some(name.clone());
+        let mut pinned = content.clone();
+        pinned.effect = name;
+        construct_effect(&pinned, cols, rows, seed, generation, picker, clock_kind)
+    }
+
+    fn waiting_seeded_session() -> Session {
+        let art = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/branding/screensaver.txt"
+        ))
+        .unwrap();
+        let mut session = Session::create(
+            art,
+            "wipe".into(),
+            Vec::new(),
+            [1, 2, 3, 255],
+            Some(1),
+            20,
+            8,
+            ClockKind::Virtual60,
+        )
+        .unwrap();
+        for _ in 0..20_000 {
+            if session.step(1.0 / 60.0).unwrap().waiting {
+                break;
+            }
+        }
+        assert!(session.is_waiting());
+        session
+    }
+
+    #[test]
+    fn construction_error_does_not_promote_candidate() {
+        let mut session = waiting_seeded_session();
+        let mut control = waiting_seeded_session();
+        let before = session.published_c_frame();
+        let selected_before = session.selected.clone();
+        let selected_next_before = session.selected_next.clone();
+        let accumulator_before = session.accumulator;
+        let stepping_before = session.stepping;
+        let error_before = session.last_error.clone();
+
+        let result = session.begin_next_with_config_using(
+            "CANDIDATE".into(),
+            vec!["beams".into()],
+            30,
+            12,
+            |_, _, _, _, _, _, _| Err(EngineError::Engine("injected build failure".into())),
+        );
+
+        assert!(matches!(result, Err(EngineError::Engine(_))));
+        let after = session.published_c_frame();
+        assert!(session.is_waiting());
+        assert_eq!(session.generation(), 0);
+        assert_eq!((after.cols, after.rows), (before.cols, before.rows));
+        assert_eq!(after.cells, before.cells);
+        assert_eq!(
+            [after.clear_r, after.clear_g, after.clear_b, after.clear_a],
+            [
+                before.clear_r,
+                before.clear_g,
+                before.clear_b,
+                before.clear_a
+            ]
+        );
+        assert_eq!(session.selected.art, selected_before.art);
+        assert_eq!(session.selected.effect, selected_before.effect);
+        assert_eq!(session.selected.bg, selected_before.bg);
+        assert_eq!(session.selected.pool, selected_before.pool);
+        assert_eq!(session.selected_next.art, selected_next_before.art);
+        assert_eq!(session.selected_next.effect, selected_next_before.effect);
+        assert_eq!(session.selected_next.bg, selected_next_before.bg);
+        assert_eq!(session.selected_next.pool, selected_next_before.pool);
+        assert_eq!(session.accumulator, accumulator_before);
+        assert_eq!(session.stepping, stepping_before);
+        assert_eq!(session.last_error, error_before);
+
+        // Compare the next random selection with an untouched seeded control
+        // as an observable proxy that failure did not consume the live stream.
+        session
+            .begin_next_with_config("NEXT".into(), Vec::new(), 20, 8)
+            .unwrap();
+        control
+            .begin_next_with_config("NEXT".into(), Vec::new(), 20, 8)
+            .unwrap();
+        let actual = session.step(1.0 / 60.0).unwrap().frame;
+        let expected = control.step(1.0 / 60.0).unwrap().frame;
+        assert_eq!((actual.cols, actual.rows), (expected.cols, expected.rows));
+        let actual_cells = unsafe {
+            std::slice::from_raw_parts(actual.cells, (actual.cols * actual.rows) as usize)
+        };
+        let expected_cells = unsafe {
+            std::slice::from_raw_parts(expected.cells, (expected.cols * expected.rows) as usize)
+        };
+        assert_eq!(actual_cells.len(), expected_cells.len());
+        for (actual, expected) in actual_cells.iter().zip(expected_cells) {
+            assert_eq!(actual.glyph, expected.glyph);
+            assert_eq!(
+                (actual.fg_r, actual.fg_g, actual.fg_b, actual.fg_a),
+                (expected.fg_r, expected.fg_g, expected.fg_b, expected.fg_a)
+            );
+            assert_eq!(
+                (actual.bg_r, actual.bg_g, actual.bg_b, actual.bg_a),
+                (expected.bg_r, expected.bg_g, expected.bg_b, expected.bg_a)
+            );
+            assert_eq!(actual.flags, expected.flags);
+            assert_eq!(actual.occupancy, expected.occupancy);
+        }
+    }
+
+    #[test]
+    fn next_selection_continues_the_creation_selector_stream() {
+        let seed = 17;
+        let initial_pool = vec!["wipe".to_string(), "beams".to_string()];
+        let next_pool = vec!["burn".to_string(), "slide".to_string()];
+        let art = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/branding/screensaver.txt"
+        ))
+        .unwrap();
+        let mut session = Session::create(
+            art,
+            "random".into(),
+            initial_pool.clone(),
+            [0, 0, 0, 255],
+            Some(seed),
+            20,
+            8,
+            ClockKind::Virtual60,
+        )
+        .unwrap();
+        for _ in 0..20_000 {
+            if session.step(1.0 / 60.0).unwrap().waiting {
+                break;
+            }
+        }
+        assert!(session.is_waiting());
+
+        let mut control = Rng::seeded(seed);
+        pick_effect_name("random", &initial_pool, &mut control);
+        let expected = pick_effect_name("random", &next_pool, &mut control).to_string();
+        let mut actual = None;
+        session
+            .begin_next_with_config_using(
+                "NEXT".into(),
+                next_pool,
+                20,
+                8,
+                |content, cols, rows, seed, generation, picker, clock| {
+                    build_after_recording_selection(
+                        content,
+                        cols,
+                        rows,
+                        seed,
+                        generation,
+                        picker,
+                        clock,
+                        &mut actual,
+                    )
+                },
+            )
+            .unwrap();
+        assert_eq!(actual.as_deref(), Some(expected.as_str()));
+    }
+
+    #[test]
+    fn failed_selection_is_rolled_back_and_retry_matches_control() {
+        let pool = vec!["wipe".to_string(), "beams".to_string()];
+        let mut session = waiting_seeded_session();
+        let mut control = Rng::seeded(1);
+        let expected = pick_effect_name("random", &pool, &mut control).to_string();
+        let mut failed = None;
+        let result = session.begin_next_with_config_using(
+            "NEXT".into(),
+            pool.clone(),
+            20,
+            8,
+            |content, _, _, _, _, picker, _| {
+                failed = Some(pick_effect_name(&content.effect, &content.pool, picker).to_string());
+                Err(EngineError::Engine("injected after selection".into()))
+            },
+        );
+        assert!(matches!(result, Err(EngineError::Engine(_))));
+
+        let mut retried = None;
+        session
+            .begin_next_with_config_using(
+                "NEXT".into(),
+                pool,
+                20,
+                8,
+                |content, cols, rows, seed, generation, picker, clock| {
+                    build_after_recording_selection(
+                        content,
+                        cols,
+                        rows,
+                        seed,
+                        generation,
+                        picker,
+                        clock,
+                        &mut retried,
+                    )
+                },
+            )
+            .unwrap();
+        assert_eq!(failed.as_deref(), Some(expected.as_str()));
+        assert_eq!(retried, failed);
     }
 }
 
@@ -402,6 +598,7 @@ fn construct_effect(
     };
     let clock = match clock_kind {
         ClockKind::Real => Clock::real(),
+        #[cfg(test)]
         ClockKind::Virtual60 => Clock::virtual_with_frame_rate(60),
     };
     let mut ctx = EngineCtx::new(&content.art, config, rng, clock)
@@ -413,34 +610,14 @@ fn construct_effect(
     Ok((effect, ctx))
 }
 
-pub fn parse_c_string(bytes: Option<&[u8]>, required: bool, what: &str) -> Result<String, EngineError> {
+pub fn parse_c_string(
+    bytes: Option<&[u8]>,
+    required: bool,
+    what: &str,
+) -> Result<String, EngineError> {
     match bytes {
         None if required => Err(EngineError::InvalidArg(format!("{what} is required"))),
         None => Ok(String::new()),
         Some(b) => parse_utf8(b, what),
     }
-}
-
-pub fn parse_pending(
-    ascii: Option<&[u8]>,
-    effect: Option<&[u8]>,
-    bg: [u8; 4],
-) -> Result<ContentPacket, EngineError> {
-    let effect = parse_c_string(effect, true, "effect")?;
-    if effect.is_empty() {
-        return Err(EngineError::InvalidArg("effect is required".into()));
-    }
-    validate_effect(&effect)?;
-    let art = match ascii {
-        None | Some([]) => None,
-        Some(b) => {
-            let s = parse_utf8(b, "ascii")?;
-            validate_art(&s)?;
-            Some(s)
-        }
-    };
-    if !is_known_effect(&effect) {
-        return Err(EngineError::InvalidArg("unknown effect".into()));
-    }
-    Ok(ContentPacket { art, effect, bg })
 }

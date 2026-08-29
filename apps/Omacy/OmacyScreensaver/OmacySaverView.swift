@@ -187,7 +187,8 @@ final class OmacySaverView: ScreenSaverView {
     }
 
     private func drawPreviewArt() {
-        let settings = OmacyStore.loadSettings()
+        let configuration = OmacyStore.loadConfiguration()
+        let settings = configuration.settings
         let rgba = settings.backgroundRGBA
         NSColor(
             srgbRed: CGFloat(rgba.0) / 255,
@@ -197,7 +198,7 @@ final class OmacySaverView: ScreenSaverView {
         ).setFill()
         bounds.fill()
 
-        let art = OmacyStore.loadArt()
+        let art = configuration.art
         let fontSize = OmacyLayout.fittingFontSize(art: art, in: bounds.size, cap: 18)
         let font = OmacyFont.makeFont(size: fontSize)
         let attrs: [NSAttributedString.Key: Any] = [

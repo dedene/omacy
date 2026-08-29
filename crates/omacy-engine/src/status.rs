@@ -1,35 +1,24 @@
-use std::ffi::c_int;
-
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum OmacyStatus {
-    Ok = 0,
-    Null = 1,
-    InvalidArg = 2,
-    Limit = 3,
-    Engine = 4,
-    Panic = 5,
-    Dead = 6,
-    WrongThread = 7,
-}
+pub struct OmacyStatus(pub i32);
 
 impl OmacyStatus {
-    pub fn as_c_int(self) -> c_int {
-        self as c_int
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            OmacyStatus::Ok => "OMACY_OK",
-            OmacyStatus::Null => "OMACY_ERR_NULL",
-            OmacyStatus::InvalidArg => "OMACY_ERR_INVALID_ARG",
-            OmacyStatus::Limit => "OMACY_ERR_LIMIT",
-            OmacyStatus::Engine => "OMACY_ERR_ENGINE",
-            OmacyStatus::Panic => "OMACY_ERR_PANIC",
-            OmacyStatus::Dead => "OMACY_ERR_DEAD",
-            OmacyStatus::WrongThread => "OMACY_ERR_WRONG_THREAD",
-        }
-    }
+    #[allow(non_upper_case_globals)]
+    pub const Ok: Self = Self(0);
+    #[allow(non_upper_case_globals)]
+    pub const Null: Self = Self(1);
+    #[allow(non_upper_case_globals)]
+    pub const InvalidArg: Self = Self(2);
+    #[allow(non_upper_case_globals)]
+    pub const Limit: Self = Self(3);
+    #[allow(non_upper_case_globals)]
+    pub const Engine: Self = Self(4);
+    #[allow(non_upper_case_globals)]
+    pub const Panic: Self = Self(5);
+    #[allow(non_upper_case_globals)]
+    pub const Dead: Self = Self(6);
+    #[allow(non_upper_case_globals)]
+    pub const WrongThread: Self = Self(7);
 
     pub fn as_c_str(self) -> &'static std::ffi::CStr {
         match self {
@@ -41,6 +30,7 @@ impl OmacyStatus {
             OmacyStatus::Panic => c"OMACY_ERR_PANIC",
             OmacyStatus::Dead => c"OMACY_ERR_DEAD",
             OmacyStatus::WrongThread => c"OMACY_ERR_WRONG_THREAD",
+            _ => c"OMACY_UNKNOWN",
         }
     }
 }
@@ -70,7 +60,9 @@ impl EngineError {
     pub fn message(&self) -> String {
         match self {
             EngineError::Null => "null pointer".into(),
-            EngineError::InvalidArg(m) | EngineError::Limit(m) | EngineError::Engine(m) => m.clone(),
+            EngineError::InvalidArg(m) | EngineError::Limit(m) | EngineError::Engine(m) => {
+                m.clone()
+            }
             EngineError::Dead => "session is dead".into(),
             EngineError::WrongThread => "wrong thread".into(),
         }

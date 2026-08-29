@@ -4,17 +4,26 @@ import UniformTypeIdentifiers
 
 struct ConfigView: View {
     @Environment(\.dismissWindow) private var dismissWindow
-    @State private var settings = OmacyStore.loadSettings()
-    @State private var art = OmacyStore.loadArt()
-    @State private var previewArt = OmacyStore.loadArt()
-    @State private var highlighted = OmacyStore.loadSettings().effects.first
-        ?? OmacyEffects.names[0]
+    @State private var settings: OmacySettings
+    @State private var art: String
+    @State private var previewArt: String
+    @State private var highlighted: String
     @State private var status = "Ready"
     @State private var importer = false
     @State private var confirmReset = false
     @State private var stagedImage: Data?
     @State private var reconvertTask: Task<Void, Never>?
     @State private var previewTask: Task<Void, Never>?
+
+    init() {
+        let configuration = OmacyStore.loadConfiguration()
+        _settings = State(initialValue: configuration.settings)
+        _art = State(initialValue: configuration.art)
+        _previewArt = State(initialValue: configuration.art)
+        _highlighted = State(
+            initialValue: configuration.settings.effects.first ?? OmacyEffects.names[0]
+        )
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -116,7 +125,7 @@ struct ConfigView: View {
                 Stepper(
                     "Font size \(Int(settings.fontSize)) pt",
                     value: $settings.fontSize,
-                    in: 8...48
+                    in: 8...OmacySettingsCodec.maximumFontSize
                 )
             }
             if let error = OmacyStore.lastLoadError {
@@ -171,7 +180,7 @@ struct ConfigView: View {
     }
 
     @discardableResult
-    private func persist(message: String = "Saved to App Group") -> Bool {
+    private func persist(message: String = "Saved to ~/.config/omacy") -> Bool {
         do {
             settings.syncEngineEffect()
             try OmacyStore.save(settings: settings, art: art)
@@ -234,35 +243,14 @@ struct ConfigView: View {
 
     private func applyStagedConversion() {
         guard let data = stagedImage else { return }
-        var cfg = OmacyAsciiConfig()
-        cfg.mode = settings.asciiModeCode
-        cfg.width = 80
-        cfg.height = 26
-        cfg.threshold = UInt8(settings.threshold)
-        cfg.invert = settings.invert ? 1 : 0
-        cfg.trim = 1
-        var text: OpaquePointer?
-        let statusCode = data.withUnsafeBytes { raw in
-            omacy_ascii_from_bytes(
-                &cfg,
-                raw.bindMemory(to: UInt8.self).baseAddress,
-                data.count,
-                &text
-            )
+        do {
+            art = try OmacyAsciiConverter.convert(data, settings: settings)
+            previewArt = art
+            status = "Preview — Save to keep"
+            growWindowIfNeeded()
+        } catch {
+            status = error.localizedDescription
         }
-        defer { omacy_text_free(text) }
-        guard statusCode == OMACY_OK, let text, let ptr = omacy_text_utf8(text) else {
-            status = "Conversion failed"
-            return
-        }
-        let n = omacy_text_len(text)
-        art = String(
-            bytes: UnsafeBufferPointer(start: ptr, count: n).map { UInt8(bitPattern: $0) },
-            encoding: .utf8
-        ) ?? art
-        previewArt = art
-        status = "Preview — Save to keep"
-        growWindowIfNeeded()
     }
 
     private func schedulePreview(_ next: String) {

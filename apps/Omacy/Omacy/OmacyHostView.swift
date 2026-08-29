@@ -4,7 +4,6 @@ final class OmacyHostView: NSView {
     private let renderer = OmacyRenderer()
     private let canary = OmacyCanaryAnimator()
     private var usingCanary = false
-    private var observingConfig = false
     private var started = false
     private var pinned: OmacyPinnedContent?
     private var lastLaidOutSize: CGSize = .zero
@@ -108,10 +107,6 @@ final class OmacyHostView: NSView {
         start()
     }
 
-    func applyPendingConfig() {
-        renderer.applyPendingConfig()
-    }
-
     private func retargetDisplayLink() {
         guard started, !usingCanary else { return }
         renderer.retargetDisplayLink()
@@ -119,9 +114,6 @@ final class OmacyHostView: NSView {
 
     private func start() {
         stop()
-        if pinned == nil {
-            observeConfig()
-        }
         started = true
         if let pinned {
             renderer.pinnedContent = pinned
@@ -139,10 +131,6 @@ final class OmacyHostView: NSView {
         started = false
         renderer.stop()
         canary.stop()
-        if observingConfig {
-            NotificationCenter.default.removeObserver(self, name: .omacyConfigDidChange, object: nil)
-            observingConfig = false
-        }
     }
 
     private func switchToCanary() {
@@ -155,18 +143,4 @@ final class OmacyHostView: NSView {
         canary.start()
     }
 
-    private func observeConfig() {
-        guard !observingConfig else { return }
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(configDidChange),
-            name: .omacyConfigDidChange,
-            object: nil
-        )
-        observingConfig = true
-    }
-
-    @objc private func configDidChange() {
-        applyPendingConfig()
-    }
 }

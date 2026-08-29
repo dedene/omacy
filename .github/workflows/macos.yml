@@ -31,11 +31,9 @@ jobs:
             -scheme Omacy \
             -configuration Release \
             -destination 'generic/platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/OmacyDerivedData" \
             -skipMacroValidation \
             -skipPackagePluginValidation \
-            ARCHS=arm64 \
-            ONLY_ACTIVE_ARCH=YES \
-            EXCLUDED_ARCHS=x86_64 \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
@@ -44,3 +42,33 @@ jobs:
             DEVELOPMENT_TEAM="" \
             ENABLE_HARDENED_RUNTIME=NO \
             build
+      - name: Verify arm64-only products and build contract
+        run: |
+          test "$(lipo -archs "$RUNNER_TEMP/OmacyDerivedData/Build/Products/Release/Omacy.app/Contents/MacOS/Omacy")" = arm64
+          test "$(lipo -archs "$RUNNER_TEMP/OmacyDerivedData/Build/Products/Release/Omacy.app/Contents/PlugIns/OmacyScreensaver.appex/Contents/MacOS/OmacyScreensaver")" = arm64
+          test "$(lipo -archs "$RUNNER_TEMP/OmacyDerivedData/Build/Products/Release/libomacy_engine.a")" = arm64
+          apps/Omacy/scripts/test-build-engine-contract.sh
+          scripts/verify-screensaver-entitlements.sh \
+            apps/Omacy/OmacyScreensaver/OmacyScreensaver.entitlements \
+            "$RUNNER_TEMP/OmacyDerivedData/Build/Products/Release/Omacy.app/Contents/PlugIns/OmacyScreensaver.appex/Contents/MacOS/OmacyScreensaver"
+          scripts/test-verify-screensaver-entitlements.sh
+      - name: Run Swift unit tests
+        working-directory: apps/Omacy
+        run: |
+          export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
+          xcodebuild \
+            -project Omacy.xcodeproj \
+            -scheme Omacy \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/OmacyDerivedData" \
+            -skipMacroValidation \
+            -skipPackagePluginValidation \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="" \
+            ENABLE_HARDENED_RUNTIME=NO \
+            test

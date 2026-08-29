@@ -23,7 +23,9 @@ fn screensaver_thumbnails_are_landscape_brand() {
         colors.len()
     );
     assert!(
-        colors.iter().any(|c| c[1] > 180 && c[0] > 100 && c[2] < 140),
+        colors
+            .iter()
+            .any(|c| c[1] > 180 && c[0] > 100 && c[2] < 140),
         "field is brand green"
     );
     assert!(colors.contains(&[0, 0, 0]), "glyph is black");

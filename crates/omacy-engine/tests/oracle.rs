@@ -1,7 +1,7 @@
 #[path = "sgr_decode.rs"]
 mod sgr_decode;
 
-use omacy_engine::abi::OmacyCell;
+use crate::abi::OmacyCell;
 use sgr_decode::{decode_ansi, occupancy};
 
 fn fixture(name: &str) -> String {
@@ -87,8 +87,12 @@ fn sgr_ansi16_lengths() {
     let fg = decode_ansi(&fixture("sgr-ansi16-fg.ans"), 16, 1, [0, 0, 0]);
     assert_eq!(fg[0].glyph, u32::from('A'));
     assert_eq!(fg[15].glyph, u32::from('P'));
-    assert!(fg.iter().all(|c| occupancy(c) == (false, true) && c.flags == 0));
+    assert!(fg
+        .iter()
+        .all(|c| occupancy(c) == (false, true) && c.flags == 0));
 
     let bg = decode_ansi(&fixture("sgr-ansi16-bg.ans"), 16, 1, [0, 0, 0]);
-    assert!(bg.iter().all(|c| occupancy(c) == (true, false) && c.flags == 0));
+    assert!(bg
+        .iter()
+        .all(|c| occupancy(c) == (true, false) && c.flags == 0));
 }

@@ -13,6 +13,98 @@ import PaperSaverKit
 
 private let logger = AppexLog.logger("PluginManager")
 
+struct OmacyUpdateRecovery {
+    let currentIdentity: String
+    let storedIdentity: () -> String?
+    let isActiveScreensaver: () -> Bool
+    let registerExtension: () throws -> Void
+    let restartWallpaperAgent: () throws -> Void
+    let recordIdentity: (String) -> Void
+
+    func reconcile() throws {
+        guard storedIdentity() != currentIdentity else { return }
+        if isActiveScreensaver() {
+            try registerExtension()
+            try restartWallpaperAgent()
+        }
+        recordIdentity(currentIdentity)
+    }
+}
+
+enum OmacyUpdateRecoveryLauncher {
+    private static let recordedIdentityKey = "lastReconciledScreensaverIdentity"
+    private static let activeNames: Set<String> = [
+        "Omacy", "OmacyScreensaver", "be.zenjoy.omacy.screensaver",
+    ]
+
+    static func reconcileAfterLaunch(
+        bundle: Bundle = .main,
+        defaults: UserDefaults = .standard
+    ) {
+        guard bundle.bundlePath.hasPrefix("/Applications/"),
+              let extensionURL = bundle.builtInPlugInsURL?
+                .appendingPathComponent("OmacyScreensaver.appex"),
+              let extensionBundle = Bundle(url: extensionURL),
+              let shortVersion = extensionBundle.object(
+                forInfoDictionaryKey: "CFBundleShortVersionString"
+              ) as? String,
+              let buildVersion = extensionBundle.object(
+                forInfoDictionaryKey: "CFBundleVersion"
+              ) as? String else { return }
+
+        let identity = "\(shortVersion):\(buildVersion)"
+        let recovery = OmacyUpdateRecovery(
+            currentIdentity: identity,
+            storedIdentity: { defaults.string(forKey: recordedIdentityKey) },
+            isActiveScreensaver: {
+                PaperSaver().getActiveScreensavers().contains { activeNames.contains($0) }
+            },
+            registerExtension: {
+                try runProcess(
+                    "/usr/bin/pluginkit", arguments: ["-a", extensionURL.path],
+                    acceptedStatuses: [0]
+                )
+            },
+            restartWallpaperAgent: {
+                // PaperSaver uses the same field-proven refresh after changing
+                // screen saver configuration. Status 1 means no agent was running.
+                try runProcess(
+                    "/usr/bin/killall", arguments: ["WallpaperAgent"],
+                    acceptedStatuses: [0, 1]
+                )
+            },
+            recordIdentity: { defaults.set($0, forKey: recordedIdentityKey) }
+        )
+
+        do {
+            try recovery.reconcile()
+        } catch {
+            logger.error("Update reconciliation failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private static func runProcess(
+        _ path: String,
+        arguments: [String],
+        acceptedStatuses: Set<Int32>
+    ) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = arguments
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        guard acceptedStatuses.contains(process.terminationStatus) else {
+            throw NSError(
+                domain: "be.zenjoy.omacy.update-recovery",
+                code: Int(process.terminationStatus),
+                userInfo: [NSLocalizedDescriptionKey: "\(path) exited with status \(process.terminationStatus)"]
+            )
+        }
+    }
+}
+
 @MainActor
 class PluginManager: ObservableObject {
     @Published var isInstalled: Bool = false

@@ -10,12 +10,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - name: Vendor verifier self-tests (network-free)
+        run: scripts/test-verify-ttfx-vendor.sh
+      - name: Verify vendored ttfx provenance
+        run: scripts/verify-ttfx-vendor.sh
+        timeout-minutes: 5
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.88.0
       - name: Engine tests
         run: cargo test -p omacy-engine
+      - name: Generated header is current
+        run: cargo xtask header check
+      - name: Header generator tests
+        run: cargo test -p xtask
+      - name: C11 header layout
+        run: cc -std=c11 -Wall -Wextra -Werror -pedantic -I crates/omacy-engine/include -fsyntax-only crates/omacy-engine/tests/abi_header_layout.c
+      - name: Previous C declaration remains compatible
+        run: cc -std=c11 -Wall -Wextra -Werror -pedantic -I crates/omacy-engine/include -fsyntax-only crates/omacy-engine/tests/abi_previous_declaration.c
+      - name: C++17 header layout
+        run: c++ -x c++ -std=c++17 -Wall -Wextra -Werror -pedantic -I crates/omacy-engine/include -fsyntax-only crates/omacy-engine/tests/abi_header_layout.c
+      - name: C ABI links and runs
+        run: cargo build -p omacy-engine && cc -std=c11 -Wall -Wextra -Werror -pedantic -I crates/omacy-engine/include crates/omacy-engine/tests/abi_header_layout.c target/debug/libomacy_engine.a -ldl -lpthread -lm -o /tmp/omacy-abi-check && /tmp/omacy-abi-check && cc -std=c11 -Wall -Wextra -Werror -pedantic -I crates/omacy-engine/include crates/omacy-engine/tests/abi_previous_declaration.c target/debug/libomacy_engine.a -ldl -lpthread -lm -o /tmp/omacy-abi-compat && /tmp/omacy-abi-compat
+      - name: Removed legacy symbols stay removed
+        run: '! nm -g --defined-only target/debug/libomacy_engine.a | grep -E " omacy_session_(resize|set_pending_config|begin_next)$"'
       - name: Vendored ttfx tests
         run: cargo test --manifest-path vendor/ttfx/Cargo.toml

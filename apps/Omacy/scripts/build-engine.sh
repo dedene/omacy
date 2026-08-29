@@ -2,7 +2,15 @@
 # Xcode run script: build libomacy_engine.a for the active Mac architecture.
 # Xcode script phases reset PATH to Apple's toolchain dirs, so rustup/cargo
 # from the developer machine or GitHub Actions must be put back explicitly.
-set -euo pipefail
+set -eu
+
+ARCHS_EFFECTIVE="${ARCHS:-}"
+if [ "$ARCHS_EFFECTIVE" != "arm64" ]; then
+  echo "error: Omacy supports exactly ARCHS=arm64; received '${ARCHS_EFFECTIVE:-<empty>}'" >&2
+  echo "error: set the Xcode ARCHS build setting to arm64 (single architecture)" >&2
+  exit 64
+fi
+
 CARGO_BIN="${CARGO_HOME:-$HOME/.cargo}/bin"
 export PATH="${CARGO_BIN}:/opt/homebrew/bin:/usr/local/bin:${PATH}"
 if [ -f "${HOME}/.cargo/env" ]; then
@@ -16,12 +24,7 @@ if ! command -v cargo >/dev/null 2>&1; then
 fi
 ROOT="${SRCROOT}/../.."
 cd "$ROOT"
-ARCHS_EFFECTIVE="${ARCHS:-arm64}"
-case "$ARCHS_EFFECTIVE" in
-  *arm64*) RUST_TARGET="aarch64-apple-darwin" ;;
-  *x86_64*) RUST_TARGET="x86_64-apple-darwin" ;;
-  *) RUST_TARGET="aarch64-apple-darwin" ;;
-esac
+RUST_TARGET="aarch64-apple-darwin"
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-15.0}"
 if command -v rustup >/dev/null 2>&1; then
   rustup target add "$RUST_TARGET" >/dev/null 2>&1 || true

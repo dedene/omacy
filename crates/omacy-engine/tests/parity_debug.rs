@@ -1,10 +1,9 @@
 //! Regression: effects that restore coordinates after ctx.frame() (unstable rumble)
 //! must still publish the displayed grid.
 
-use omacy_engine::abi::OmacyCell;
+use crate::abi::OmacyCell;
 use ttfx::effects::EffectCommand;
 use ttfx::engine::ctx::{Clock, EngineCtx};
-use ttfx::engine::effect::Effect;
 use ttfx::engine::terminal::TerminalConfig;
 use ttfx::utils::graphics::Color;
 use ttfx::utils::rng::Rng;
@@ -15,8 +14,13 @@ mod sgr_decode;
 fn run(name: &str, input: &str, cols: i64, rows: i64, frames: u32) {
     let mut effect = EffectCommand::from_name(name).unwrap();
     let config = TerminalConfig::gui(cols, rows, Color::from_hex("000000").unwrap());
-    let mut ctx =
-        EngineCtx::new(input, config, Rng::seeded(1), Clock::virtual_with_frame_rate(60)).unwrap();
+    let mut ctx = EngineCtx::new(
+        input,
+        config,
+        Rng::seeded(1),
+        Clock::virtual_with_frame_rate(60),
+    )
+    .unwrap();
     effect.build(&mut ctx).unwrap();
     let mut packed = vec![OmacyCell::default(); (cols * rows) as usize];
     for frame in 0..frames {

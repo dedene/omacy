@@ -1,0 +1,79 @@
+language = "C"
+include_guard = "OMACY_H"
+cpp_compat = true
+documentation = false
+usize_is_size_t = true
+style = "type"
+sort_by = "Name"
+after_includes = """
+#define OMACY_CELL_HAS_BACKGROUND 1
+#define OMACY_CELL_HAS_GLYPH 2
+typedef int32_t omacy_status;
+#define OMACY_OK ((omacy_status)0)
+#define OMACY_ERR_NULL ((omacy_status)1)
+#define OMACY_ERR_INVALID_ARG ((omacy_status)2)
+#define OMACY_ERR_LIMIT ((omacy_status)3)
+#define OMACY_ERR_ENGINE ((omacy_status)4)
+#define OMACY_ERR_PANIC ((omacy_status)5)
+#define OMACY_ERR_DEAD ((omacy_status)6)
+#define OMACY_ERR_WRONG_THREAD ((omacy_status)7)
+typedef struct OmacyText OmacyText;
+"""
+
+[parse]
+parse_deps = true
+include = ["ttfx"]
+
+[export]
+include = [
+  "OmacyAsciiConfig",
+  "OmacyByteSlice",
+  "OmacyFrame",
+  "OmacySessionConfig",
+  "OmacyStatus",
+  "OmacyStepResult",
+  "PackedCell",
+  "Session",
+  "omacy_ascii_from_bytes",
+  "omacy_effect_catalog_count",
+  "omacy_effect_catalog_get",
+  "omacy_session_begin_next_with_config",
+  "omacy_session_create",
+  "omacy_session_destroy",
+  "omacy_session_error_message",
+  "omacy_session_generation",
+  "omacy_session_step",
+  "omacy_status_string",
+  "omacy_text_free",
+  "omacy_text_len",
+  "omacy_text_utf8",
+]
+exclude = [
+  "ASCII_BYTES",
+  "ASCII_COLUMNS",
+  "ASCII_LINES",
+  "CONV_CELLS",
+  "CONV_COLUMNS",
+  "CONV_ROWS",
+  "DECODED_PIXELS",
+  "GRID_AXIS",
+  "GRID_CELLS",
+  "MAX_STEPS_PER_CALL",
+  "PNG_BYTES",
+  "STEP_DT",
+  "STEP_HZ",
+  "SVG_BYTES",
+  "SVG_ELEMENTS",
+  "Vec_u8",
+  "OmacyText",
+  "OmacyStatus",
+]
+
+[export.rename]
+OmacyStatus = "omacy_status"
+PackedCell = "OmacyCell"
+Session = "OmacySession"
+
+[enum]
+prefix_with_name = false
+rename_variants = "ScreamingSnakeCase"

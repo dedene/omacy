@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use omacy_engine::session::{ClockKind, Session};
+use crate::session::{ClockKind, Session};
 
 fn wordmark() -> String {
     std::fs::read_to_string(format!(
@@ -14,8 +14,8 @@ fn max_grid_session() -> Session {
     Session::create(
         wordmark(),
         "wipe".into(),
+        Vec::new(),
         [0, 0, 0, 255],
-        None,
         Some(1),
         256,
         128,
