@@ -6,7 +6,7 @@ fn imageset() -> std::path::PathBuf {
 }
 
 #[test]
-fn screensaver_thumbnails_are_landscape_canary() {
+fn screensaver_thumbnails_are_landscape_brand() {
     let dir = imageset();
     let one_x = image::open(dir.join("thumbnail.png")).expect("thumbnail.png");
     let two_x = image::open(dir.join("thumbnail@2x.png")).expect("thumbnail@2x.png");
@@ -19,10 +19,12 @@ fn screensaver_thumbnails_are_landscape_canary() {
     let colors: HashSet<_> = rgb.pixels().map(|p| p.0).collect();
     assert!(
         colors.len() >= 3,
-        "thumbnail must show the canary (field + blank + glyph), got {} colors",
+        "thumbnail must have field + glyph + edges, got {} colors",
         colors.len()
     );
-    assert!(colors.contains(&[0, 0, 0]), "field is black");
-    assert!(colors.iter().any(|c| c[2] > 200 && c[0] < 80), "bottom-left blank is blue");
-    assert!(colors.contains(&[255, 255, 255]), "top-right glyph is white");
+    assert!(
+        colors.iter().any(|c| c[1] > 180 && c[0] > 100 && c[2] < 140),
+        "field is brand green"
+    );
+    assert!(colors.contains(&[0, 0, 0]), "glyph is black");
 }

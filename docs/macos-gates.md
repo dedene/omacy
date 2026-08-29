@@ -9,7 +9,7 @@ Host sources include last-known-good App Group writes, stop-before-start lifecyc
 | Host + appex compile (Xcode, ad-hoc) | **Pass** — local Xcode 26.6 `xcodebuild` Release arm64 `BUILD SUCCEEDED`; nested `OmacyScreensaver.appex` (`be.zenjoy.omacy.screensaver`, `com.apple.screensaver`) |
 | Install: DMG → `/Applications` or Xcode DerivedData | Unverified |
 | Discover: listed with first-party savers in System Settings | Unverified |
-| Thumbnail 107×65 / 214×130 | Landscape canary fixture PNGs present; System Settings listing unverified |
+| Thumbnail 107×65 / 214×130 | Landscape brand PNGs present; System Settings listing unverified |
 | Enable via PaperSaver `setScreensaverEverywhere` and Settings | Sources present; unverified |
 | Idle activation on macOS 26 | Unverified |
 | Multi-display paints the fixture / engine | Code waits for ScreenSaverEngine’s per-window screen migration and uses per-window backing scale; idle paint still unverified |
