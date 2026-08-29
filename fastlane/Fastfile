@@ -84,11 +84,13 @@ def hydrate_release_env_from_one_password!
   payload = JSON.parse(capture_command!(*args, error_message: "Failed to read release env from 1Password"))
 
   Array(payload["fields"]).each do |field|
-    next if field["purpose"] == "PASSWORD" || field["purpose"] == "NOTES"
+    next if field["purpose"] == "NOTES"
 
     key = field["label"] || field["id"]
     env_key = key.to_s.strip.upcase.gsub(/[^A-Z0-9]+/, "_").gsub(/\A_+|_+\z/, "")
     next if env_key.empty?
+    # Skip a Login item's unnamed primary password, but keep MATCH_PASSWORD and other labeled secrets.
+    next if field["purpose"] == "PASSWORD" && env_key == "PASSWORD"
 
     value = field["value"].to_s
     next if value.empty?
