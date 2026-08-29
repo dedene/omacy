@@ -57,7 +57,6 @@
 		1A0000E0000000000000000A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000E0000000000000000B /* Assets.xcassets */; };
 		1A0000E2000000000000000A /* Omacy.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000E2000000000000000B /* Omacy.icon */; };
 		1A000080000000000000000A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 1A000085000000000000000B /* Sparkle */; };
-		1A000081000000000000000A /* Sparkle in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 1A000085000000000000000B /* Sparkle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		1A000082000000000000000A /* SparkleUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000083000000000000000B /* SparkleUpdater.swift */; };
 /* End PBXBuildFile section */
 
@@ -81,17 +80,6 @@
 				1A000007000000000000000A /* OmacyScreensaver.appex in Embed PlugIns */,
 			);
 			name = "Embed PlugIns";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		1A000086000000000000000A /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				1A000081000000000000000A /* Sparkle in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -300,7 +288,6 @@
 				1A000012000000000000000A /* Frameworks */,
 				1A00001D000000000000000A /* Resources */,
 				1A000009000000000000000A /* Embed PlugIns */,
-				1A000086000000000000000A /* Embed Frameworks */,
 				1A000042000000000000000A /* Register Extensions */,
 			);
 			buildRules = (
