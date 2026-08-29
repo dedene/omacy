@@ -20,7 +20,9 @@
 </p>
 
 <p align="center">
-  <img src="assets/screenshot.png" alt="Omacy screenshot" width="880">
+  <video src="assets/animation.mp4" width="880" autoplay loop muted playsinline>
+    <a href="assets/animation.mp4">Omacy demo</a>
+  </video>
 </p>
 
 ## Features
@@ -31,6 +33,10 @@
 - **Install from the host.** Drop `Omacy.app` in `/Applications`, register the extension, enable it. Configuration lives in the app because the converter needs `NSOpenPanel`.
 
 See [architecture](docs/architecture.md), [FFI](docs/ffi.md), and [parity](docs/parity.md) for the engine contract.
+
+<p align="center">
+  <img src="assets/screenshot.png" alt="Omacy host app" width="880">
+</p>
 
 ## Install
 
