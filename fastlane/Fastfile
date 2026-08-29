@@ -1,11 +1,20 @@
+# frozen_string_literal: true
+
+require "fileutils"
 require "json"
 require "open3"
+require "shellwords"
+require "tempfile"
+
+require_relative "release_automation"
 
 default_platform(:mac)
 
 APP_NAME     = "Omacy"
 SCHEME       = "Omacy"
 PROJECT      = "apps/Omacy/Omacy.xcodeproj"
+PBXPROJ      = "#{PROJECT}/project.pbxproj"
+BUILD_NUMBER_FILE = "apps/Omacy/BuildNumber.xcconfig"
 BUILD_DIR    = "build/release"
 APP_PATH     = "#{BUILD_DIR}/#{APP_NAME}.app"
 PROJECT_ROOT = File.expand_path("..", __dir__)
@@ -14,13 +23,40 @@ BUNDLE_IDS   = [
   "be.zenjoy.omacy.screensaver"
 ].freeze
 
-def capture_command!(*args, chdir: PROJECT_ROOT, error_message: nil)
+def project_root_path(*parts)
+  File.join(PROJECT_ROOT, *parts)
+end
+
+def run_command(*args, chdir: PROJECT_ROOT)
   stdout, stderr, status = Open3.capture3(*args, chdir: chdir)
+  [stdout, stderr, status]
+end
+
+def capture_command!(*args, chdir: PROJECT_ROOT, error_message: nil)
+  stdout, stderr, status = run_command(*args, chdir: chdir)
   return stdout if status.success?
 
   message = error_message || "Command failed: #{args.join(" ")}"
   message += "\n#{stderr.strip}" unless stderr.strip.empty?
   UI.user_error!(message)
+end
+
+def command_success?(*args, chdir: PROJECT_ROOT)
+  _, _, status = run_command(*args, chdir: chdir)
+  status.success?
+end
+
+def one_password_reference?(value)
+  value.to_s.strip.start_with?("op://")
+end
+
+def ensure_one_password_ready!
+  capture_command!("op", "account", "list", error_message: "1Password CLI is not authenticated")
+end
+
+def read_one_password_reference!(reference, label:)
+  ensure_one_password_ready!
+  capture_command!("op", "read", "--no-newline", reference, error_message: "Failed to read #{label} from 1Password")
 end
 
 def hydrate_release_env_from_one_password!
@@ -32,6 +68,7 @@ def hydrate_release_env_from_one_password!
   item = ENV["OP_RELEASE_ENV_ITEM"].to_s.strip
   return if item.empty?
 
+  ensure_one_password_ready!
   args = ["op", "item", "get", item, "--format", "json", "--reveal"]
   vault = ENV["OP_RELEASE_ENV_VAULT"].to_s.strip
   args += ["--vault", vault] unless vault.empty?
@@ -51,9 +88,17 @@ def hydrate_release_env_from_one_password!
   end
 end
 
-def required_env!(name)
+def resolved_env_value(name)
   hydrate_release_env_from_one_password!
   value = ENV[name].to_s.strip
+  return "" if value.empty?
+  return read_one_password_reference!(value, label: name).rstrip if one_password_reference?(value)
+
+  value
+end
+
+def required_env!(name)
+  value = resolved_env_value(name)
   UI.user_error!("#{name} must be set") if value.empty?
   value
 end
@@ -80,7 +125,218 @@ def load_api_key
   )
 end
 
-def sync_signing!(readonly:)
+def github_repo_name_with_owner
+  capture_command!("gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner").strip
+end
+
+def github_release_records
+  output = capture_command!("gh", "release", "list", "--limit", "100", "--json", "tagName,isPrerelease,isDraft,publishedAt")
+  JSON.parse(output)
+rescue JSON::ParserError => e
+  UI.user_error!("Could not parse gh release list output: #{e.message}")
+end
+
+def latest_published_version(channel: nil)
+  releases = github_release_records
+  record =
+    case ReleaseAutomation.normalize_channel(channel)
+    when "stable"
+      releases.find { |release| !release["isPrerelease"] && !release["isDraft"] }
+    when "beta"
+      releases.find { |release| release["isPrerelease"] && !release["isDraft"] } ||
+        releases.find { |release| !release["isDraft"] }
+    else
+      releases.find { |release| !release["isDraft"] }
+    end
+
+  ReleaseAutomation.normalized_version(record && record["tagName"])
+rescue StandardError
+  nil
+end
+
+def latest_release_tag(excluding: nil)
+  github_release_records.each do |release|
+    tag = release["tagName"].to_s.strip
+    next if tag.empty?
+    next if ReleaseAutomation.normalized_version(tag) == ReleaseAutomation.normalized_version(excluding)
+
+    return tag
+  end
+  nil
+end
+
+def current_head_commit
+  capture_command!("git", "-C", PROJECT_ROOT, "rev-parse", "HEAD").strip
+end
+
+def local_tag_commit(tag_name)
+  capture_command!("git", "-C", PROJECT_ROOT, "rev-parse", "#{tag_name}^{commit}").strip
+rescue StandardError
+  nil
+end
+
+def git_tag_exists?(tag_name)
+  command_success?("git", "-C", PROJECT_ROOT, "rev-parse", "--verify", "--quiet", "refs/tags/#{tag_name}")
+end
+
+def remote_tag_exists?(tag_name)
+  stdout = capture_command!("git", "-C", PROJECT_ROOT, "ls-remote", "--tags", "origin", "refs/tags/#{tag_name}")
+  !stdout.strip.empty?
+rescue StandardError
+  false
+end
+
+def github_release_exists?(tag_name)
+  command_success?("gh", "release", "view", tag_name, "--json", "tagName", "--jq", ".tagName")
+end
+
+def ensure_release_not_conflicting!(tag_name)
+  if git_tag_exists?(tag_name)
+    tagged_commit = local_tag_commit(tag_name)
+    if tagged_commit != current_head_commit
+      UI.user_error!("Tag #{tag_name} already exists and points to #{tagged_commit}, not the release commit #{current_head_commit}")
+    end
+  end
+
+  UI.user_error!("Tag #{tag_name} already exists on origin") if !git_tag_exists?(tag_name) && remote_tag_exists?(tag_name)
+
+  UI.message("GitHub release #{tag_name} already exists; its notes body will be updated.") if github_release_exists?(tag_name)
+end
+
+def ensure_release_tools_ready!
+  hydrate_release_env_from_one_password!
+  capture_command!("gh", "auth", "status", "--hostname", "github.com", error_message: "gh is not authenticated")
+  UI.user_error!("create-dmg must be installed (brew install create-dmg)") unless command_success?("which", "create-dmg")
+  required_env!("MATCH_PASSWORD")
+  resolve_asc_key_filepath
+end
+
+def determine_release_channel(options)
+  requested = ReleaseAutomation.normalize_channel(options[:channel])
+  return requested if requested
+  return "stable" unless UI.interactive?
+
+  UI.select("Select the release channel", ReleaseAutomation::CHANNELS)
+end
+
+def determine_release_version(channel:, requested_version:)
+  latest_stable_version = latest_published_version(channel: "stable")
+  default_version = ReleaseAutomation.suggested_version(
+    channel: channel,
+    latest_version: latest_stable_version,
+    fallback_version: read_project_marketing_version
+  )
+
+  if requested_version.to_s.strip.empty?
+    return default_version unless UI.interactive?
+
+    if latest_stable_version
+      UI.message("Latest published stable version: #{latest_stable_version}")
+    else
+      UI.message("Latest published stable version: none")
+      UI.message("Using current project version #{read_project_marketing_version} as the first release default")
+    end
+    UI.message("Suggested release version: #{default_version}")
+    return default_version if UI.confirm("Use #{default_version} as the release version?")
+
+    loop do
+      response = UI.input("Enter release version:").to_s.strip
+      return response unless response.empty?
+
+      UI.important("Version cannot be empty.")
+    end
+  end
+
+  requested_version.to_s.strip
+end
+
+def prompt_release_confirmation(channel:, version:)
+  return unless UI.interactive?
+
+  UI.message("Preparing #{channel} release #{version}")
+  UI.confirm("Continue with this release?") || UI.user_error!("Release cancelled")
+end
+
+def release_tag_name(version)
+  ReleaseAutomation.release_tag(version)
+end
+
+def release_title(version)
+  "Omacy #{version}"
+end
+
+def read_project_marketing_version
+  content = File.read(project_root_path(PBXPROJ))
+  match = content.match(/MARKETING_VERSION = ([^;]+);/)
+  UI.user_error!("MARKETING_VERSION not found in #{PBXPROJ}") unless match
+  match[1].to_s
+end
+
+def read_project_build_number
+  content = File.read(project_root_path(BUILD_NUMBER_FILE))
+  match = content.match(/^CURRENT_PROJECT_VERSION\s*=\s*(\S+)/)
+  UI.user_error!("CURRENT_PROJECT_VERSION not found in #{BUILD_NUMBER_FILE}") unless match
+  match[1].to_s
+end
+
+def write_project_marketing_version(version:)
+  path = project_root_path(PBXPROJ)
+  File.write(path, ReleaseAutomation.replace_pbx_assignment(content: File.read(path), key: "MARKETING_VERSION", value: version))
+end
+
+def write_project_build_number(build_number:)
+  path = project_root_path(BUILD_NUMBER_FILE)
+  File.write(
+    path,
+    ReleaseAutomation.replace_xcconfig_assignment(
+      content: File.read(path),
+      key: "CURRENT_PROJECT_VERSION",
+      value: build_number
+    )
+  )
+end
+
+def validate_release_inputs!(channel:, version:)
+  ReleaseAutomation.validate_version!(channel: channel, version: version)
+rescue ArgumentError => e
+  UI.user_error!(e.message)
+end
+
+def release_build_number
+  capture_command!("git", "-C", PROJECT_ROOT, "rev-list", "--count", "HEAD").strip
+end
+
+def restore_release_metadata_files!
+  capture_command!("git", "-C", PROJECT_ROOT, "checkout", "--", BUILD_NUMBER_FILE, PBXPROJ)
+end
+
+def commit_release_metadata!(version:)
+  build_number = release_build_number
+  write_project_marketing_version(version: version)
+  write_project_build_number(build_number: build_number)
+
+  stdout, stderr, status = run_command(
+    "git", "commit", "--only",
+    "-m", "release: #{version} (build #{build_number})",
+    "--", PBXPROJ, BUILD_NUMBER_FILE
+  )
+  unless status.success?
+    dirty = capture_command!("git", "-C", PROJECT_ROOT, "status", "--porcelain", "--", PBXPROJ, BUILD_NUMBER_FILE)
+    if dirty.strip.empty?
+      UI.message("Release metadata already committed")
+      return read_project_build_number
+    end
+
+    message = "Failed to commit release metadata"
+    message += "\n#{stderr.strip}" unless stderr.strip.empty?
+    message += "\n#{stdout.strip}" unless stdout.strip.empty?
+    UI.user_error!(message)
+  end
+
+  build_number
+end
+
+def sync_signing!(readonly: true)
   required_env!("MATCH_PASSWORD")
   match(
     type: "developer_id",
@@ -89,6 +345,224 @@ def sync_signing!(readonly:)
     readonly: readonly,
     api_key: load_api_key
   )
+end
+
+def archive_release!(version:, build_number:)
+  build_mac_app(
+    project: PROJECT,
+    scheme: SCHEME,
+    configuration: "Release",
+    clean: true,
+    output_directory: BUILD_DIR,
+    output_name: APP_NAME,
+    export_method: "developer-id",
+    export_options: "fastlane/ExportOptions.plist",
+    xcargs: [
+      "ARCHS=arm64",
+      "ONLY_ACTIVE_ARCH=YES",
+      "EXCLUDED_ARCHS=x86_64",
+      "MARKETING_VERSION=#{Shellwords.escape(version)}",
+      "CURRENT_PROJECT_VERSION=#{Shellwords.escape(build_number)}"
+    ].join(" ")
+  )
+end
+
+def notarize_app_bundle!
+  notarize(
+    package: APP_PATH,
+    api_key: load_api_key,
+    print_log: true
+  )
+end
+
+def built_app_plist
+  project_root_path(APP_PATH, "Contents", "Info.plist")
+end
+
+def package_release_dmg!
+  version = get_info_plist_value(path: built_app_plist, key: "CFBundleShortVersionString")
+  build = get_info_plist_value(path: built_app_plist, key: "CFBundleVersion")
+  dmg_name = ReleaseAutomation.archive_basename(app_name: APP_NAME, version: version, build: build)
+  abs_build = project_root_path(BUILD_DIR)
+  abs_app = project_root_path(APP_PATH)
+  abs_dmg = File.join(abs_build, "#{dmg_name}.dmg")
+  github_dmg = File.join(abs_build, "#{APP_NAME}.dmg")
+
+  FileUtils.rm_f(abs_dmg)
+  FileUtils.rm_f(github_dmg)
+
+  staging = File.join(abs_build, "dmg-staging")
+  FileUtils.rm_rf(staging)
+  FileUtils.mkdir_p(staging)
+  FileUtils.cp_r(abs_app, staging)
+
+  args = [
+    "create-dmg",
+    "--volname", APP_NAME,
+    "--window-pos", "200", "120",
+    "--window-size", "660", "400",
+    "--icon-size", "128",
+    "--text-size", "14",
+    "--icon", "#{APP_NAME}.app", "200", "170",
+    "--hide-extension", "#{APP_NAME}.app",
+    "--app-drop-link", "460", "170",
+    "--no-internet-enable",
+    "--format", "UDZO",
+    abs_dmg,
+    staging
+  ]
+
+  stdout, stderr, status = run_command(*args)
+  unless status.success? || status.exitstatus == 2
+    message = "create-dmg failed"
+    message += "\n#{stderr.strip}" unless stderr.strip.empty?
+    message += "\n#{stdout.strip}" unless stdout.strip.empty?
+    UI.user_error!(message)
+  end
+
+  FileUtils.rm_rf(staging)
+  FileUtils.cp(abs_dmg, github_dmg)
+  UI.success("DMG created: #{abs_dmg}")
+
+  ENV["OMACY_DMG_PATH"] = abs_dmg
+  ENV["OMACY_GITHUB_DMG_PATH"] = github_dmg
+end
+
+def notarize_release_dmg!
+  dmg_path = ENV["OMACY_DMG_PATH"]
+  UI.user_error!("No DMG found") unless dmg_path && File.exist?(dmg_path)
+
+  notarize(
+    package: dmg_path,
+    api_key: load_api_key,
+    print_log: true
+  )
+  FileUtils.cp(dmg_path, ENV.fetch("OMACY_GITHUB_DMG_PATH"))
+  UI.success("DMG notarized and stapled: #{dmg_path}")
+end
+
+def local_tag_release!(tag_name, version)
+  return if git_tag_exists?(tag_name) && local_tag_commit(tag_name) == current_head_commit
+
+  sh("git", "-C", PROJECT_ROOT, "tag", "-a", tag_name, "-m", release_title(version))
+end
+
+def push_release!(tag_name)
+  sh("git", "-C", PROJECT_ROOT, "push", "origin", "HEAD")
+  sh("git", "-C", PROJECT_ROOT, "push", "origin", tag_name)
+end
+
+def generated_release_notes(tag_name:, previous_tag_name:)
+  repo = github_repo_name_with_owner
+  args = ["gh", "api", "repos/#{repo}/releases/generate-notes", "-f", "tag_name=#{tag_name}"]
+  args += ["-f", "previous_tag_name=#{previous_tag_name}"] unless previous_tag_name.to_s.strip.empty?
+  stdout = capture_command!(*args)
+  JSON.parse(stdout).fetch("body")
+rescue JSON::ParserError => e
+  UI.user_error!("Could not parse generated release notes: #{e.message}")
+end
+
+def edit_text_in_editor!(initial_text, path_hint:)
+  FileUtils.mkdir_p(File.dirname(path_hint))
+  Tempfile.create(["omacy-release-notes-", ".md"], File.dirname(path_hint)) do |file|
+    file.write(initial_text)
+    file.flush
+
+    editor = Shellwords.split(ENV.fetch("EDITOR", "vi"))
+    UI.message("Opening release notes in #{editor.first}")
+    sh(*editor, file.path)
+
+    edited_text = File.read(file.path)
+    UI.user_error!("Release notes file was left empty") if edited_text.strip.empty?
+
+    File.write(path_hint, edited_text)
+    return edited_text
+  end
+end
+
+def prepare_release_notes!(tag_name:, version:)
+  notes_path = project_root_path(BUILD_DIR, "release-notes.md")
+  FileUtils.mkdir_p(File.dirname(notes_path))
+  previous_tag = latest_release_tag(excluding: tag_name)
+  initial_text =
+    if previous_tag.to_s.strip.empty?
+      ReleaseAutomation.first_release_notes(version: version)
+    else
+      generated_release_notes(tag_name: tag_name, previous_tag_name: previous_tag)
+    end
+
+  if UI.interactive? && ENV["OMACY_RELEASE_SKIP_EDIT"].to_s.empty?
+    edit_text_in_editor!(initial_text, path_hint: notes_path)
+  else
+    File.write(notes_path, initial_text)
+  end
+
+  notes_path
+end
+
+def upsert_github_release!(tag_name:, version:, channel:, notes_path:, asset_paths: [])
+  if github_release_exists?(tag_name)
+    sh(
+      "gh", "release", "edit", tag_name,
+      "--title", release_title(version),
+      "--notes-file", notes_path
+    )
+  else
+    args = [
+      "gh", "release", "create", tag_name,
+      "--title", release_title(version),
+      "--notes-file", notes_path,
+      "--verify-tag"
+    ]
+    args << "--prerelease" if channel == "beta"
+    args << "--latest" if channel == "stable"
+    sh(*args)
+  end
+
+  paths = Array(asset_paths).select { |path| path && File.file?(path) }
+  sh("gh", "release", "upload", tag_name, *paths, "--clobber") unless paths.empty?
+end
+
+def run_release_pipeline(options)
+  channel = determine_release_channel(options)
+  version = determine_release_version(channel: channel, requested_version: options[:version])
+  version = validate_release_inputs!(channel: channel, version: version)
+  tag_name = release_tag_name(version)
+
+  ensure_release_tools_ready!
+  UI.message("Latest published stable version: #{latest_published_version(channel: "stable") || "none"}")
+  UI.message("Current project version: #{read_project_marketing_version}")
+  UI.message("Release channel: #{channel}")
+  UI.message("Release version: #{version}")
+
+  ensure_release_not_conflicting!(tag_name)
+  prompt_release_confirmation(channel: channel, version: version)
+
+  build_number = commit_release_metadata!(version: version)
+
+  sync_signing!(readonly: true)
+  archive_release!(version: version, build_number: build_number)
+  restore_release_metadata_files!
+  notarize_app_bundle!
+  package_release_dmg!
+  notarize_release_dmg!
+
+  local_tag_release!(tag_name, version)
+  notes_path = prepare_release_notes!(tag_name: tag_name, version: version)
+  push_release!(tag_name)
+  upsert_github_release!(
+    tag_name: tag_name,
+    version: version,
+    channel: channel,
+    notes_path: notes_path,
+    asset_paths: [ENV.fetch("OMACY_GITHUB_DMG_PATH")]
+  )
+
+  UI.success("Published #{release_title(version)}: https://github.com/#{github_repo_name_with_owner}/releases/tag/#{tag_name}")
+end
+
+lane :release do |options|
+  run_release_pipeline(options)
 end
 
 platform :mac do
@@ -103,27 +577,30 @@ platform :mac do
   end
 
   desc "Archive and export with Developer ID signing"
-  lane :archive do
+  lane :archive do |options|
+    version = options[:version] || read_project_marketing_version
+    build_number = options[:build] || read_project_build_number
     sync_signing!(readonly: true)
-    build_mac_app(
-      project: PROJECT,
-      scheme: SCHEME,
-      configuration: "Release",
-      clean: true,
-      output_directory: BUILD_DIR,
-      output_name: APP_NAME,
-      export_method: "developer-id",
-      export_options: "fastlane/ExportOptions.plist",
-      xcargs: "ARCHS=arm64 ONLY_ACTIVE_ARCH=YES EXCLUDED_ARCHS=x86_64"
-    )
+    archive_release!(version: version, build_number: build_number)
   end
 
   desc "Notarize the exported .app"
   lane :notarize_app do
-    notarize(
-      package: APP_PATH,
-      api_key: load_api_key,
-      print_log: true
-    )
+    notarize_app_bundle!
+  end
+
+  desc "Create a DMG from the exported .app"
+  lane :package_dmg do
+    package_release_dmg!
+  end
+
+  desc "Notarize the DMG"
+  lane :notarize_dmg do
+    notarize_release_dmg!
+  end
+
+  desc "Ship a signed, notarized GitHub release"
+  lane :release do |options|
+    run_release_pipeline(options)
   end
 end

@@ -63,6 +63,16 @@ Official Developer ID profiles live in a private match repo. Maintainers hydrate
 - Default art and conversion fixtures are committed under `assets/`. Do not vendor a floating `ttfx` master; the pin is `vendor/ttfx/PIN`.
 - `apps/Omacy/LICENSE` is the MIT license from [AppexSaverMinimal](https://github.com/AerialScreensaver/AppexSaverMinimal) (Guillaume Louel). Keep that copyright on files that still carry it.
 
+## Releases
+
+Maintainers ship a signed GitHub release with:
+
+```bash
+bundle exec fastlane release
+```
+
+That archives a Developer ID build, notarizes a DMG, tags, and publishes `Omacy.dmg`. Pass `version:0.1.1` to skip the version prompt. Pass `channel:beta` for a prerelease.
+
 ## Licensing Expectations
 
 By contributing to Omacy, you are contributing to a project published under MIT.

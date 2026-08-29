@@ -9,6 +9,8 @@
     <br />
     Your logo, or any art, animated by the 37 Terminal Text Effects.
     <br />
+    <a href="https://github.com/dedene/omacy/releases/latest/download/Omacy.dmg">Download</a>
+    ·
     <a href="#install">Install</a>
     ·
     <a href="#status">Status</a>
@@ -36,16 +38,13 @@ See [architecture](docs/architecture.md), [FFI](docs/ffi.md), and [parity](docs/
 
 ## Install
 
-Requires macOS 15 (Sequoia) or later.
+Download the latest `.dmg` from the [releases page](https://github.com/dedene/omacy/releases/latest), open it, and drag Omacy to your Applications folder.
 
-1. Build the app (see [Build](#build)), or use a signed build from [Releases](https://github.com/dedene/omacy/releases) when one exists.
-2. Put `Omacy.app` in `/Applications`.
-3. Open Omacy and register the screensaver.
-4. Enable it from the app, or in System Settings → Screen Saver.
+Then open Omacy, register the screensaver, and enable it from the app or in System Settings → Screen Saver.
 
 The host will not register the extension from a random folder. Mixing Xcode DerivedData and `/Applications` makes PlugInKit sticky — pick one.
 
-Official builds are signed and notarized by Zenjoy BV.
+Builds are signed and notarized by Zenjoy BV. Requires macOS 15 (Sequoia) or later.
 
 ## Status
 
