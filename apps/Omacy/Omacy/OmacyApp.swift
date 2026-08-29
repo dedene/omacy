@@ -48,6 +48,11 @@ struct OmacyApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Hosted XCTest launches the real app executable. Keep production-only
+        // migration, service recovery, and Sparkle startup out of that bootstrap.
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
+            return
+        }
         do {
             let legacyGroup = "group.be.zenjoy.omacy"
             try OmacyStore.performHostMigrationIfNeeded(
