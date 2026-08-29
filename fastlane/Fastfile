@@ -68,10 +68,31 @@ def op_cli(*args)
   ["op", "--account", op_account, *args]
 end
 
+def load_dotenv_file!(path)
+  return unless File.file?(path)
+
+  File.foreach(path) do |line|
+    entry = line.strip
+    next if entry.empty? || entry.start_with?("#")
+
+    key, value = entry.split("=", 2)
+    next if key.to_s.strip.empty? || value.nil?
+
+    ENV[key.strip] = value if ENV[key.strip].to_s.empty?
+  end
+end
+
+def hydrate_local_dotenv!
+  load_dotenv_file!(File.join(PROJECT_ROOT, "fastlane", ".env"))
+  sibling = File.expand_path(File.join("..", "zentty", "fastlane", ".env"), PROJECT_ROOT)
+  load_dotenv_file!(sibling)
+end
+
 def hydrate_release_env_from_one_password!
   return if defined?(@release_env_loaded) && @release_env_loaded
 
   @release_env_loaded = true
+  hydrate_local_dotenv!
   ENV["OP_RELEASE_ENV_ITEM"] = "Zentty Release Environment" if ENV["OP_RELEASE_ENV_ITEM"].to_s.strip.empty?
   ENV["OP_RELEASE_ENV_VAULT"] = "Engineering" if ENV["OP_RELEASE_ENV_VAULT"].to_s.strip.empty?
   item = ENV["OP_RELEASE_ENV_ITEM"].to_s.strip
