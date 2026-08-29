@@ -1,7 +1,7 @@
 <!-- LOGO -->
 <h1>
 <p align="center">
-  <img src="assets/icon.png" alt="Omacy" width="128">
+  <img src="assets/omacy-icon.png" alt="Omacy" width="128">
   <br>Omacy
 </h1>
   <p align="center">
@@ -19,11 +19,11 @@
   </p>
 </p>
 
-<p align="center">
-  <video src="assets/animation.mp4" width="880" autoplay loop muted playsinline>
-    <a href="assets/animation.mp4">Omacy demo</a>
-  </video>
-</p>
+<div align="center">
+
+https://github.com/user-attachments/assets/7a06339a-486d-4488-86fa-a3b8095cb3a1
+
+</div>
 
 ## Features
 
