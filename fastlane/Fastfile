@@ -529,7 +529,9 @@ def sparkle_filename_to_tag
 end
 
 def download_previous_sparkle_zips!
+  FileUtils.rm_rf(sparkle_updates_dir)
   FileUtils.mkdir_p(sparkle_updates_dir)
+  @sparkle_filename_to_tag = {}
   github_release_records.each do |release|
     next if release["isDraft"]
 
@@ -571,7 +573,8 @@ def generate_sparkle_appcast!(tag_name:)
   args = [
     sparkle_generate_appcast_binary!,
     "--download-url-prefix", "https://github.com/#{repo}/releases/latest/download/",
-    "--maximum-versions", "0"
+    "--maximum-versions", "1",
+    "--embed-release-notes"
   ]
   key_file = sparkle_private_ed_key_file
   args += ["--ed-key-file", key_file] unless key_file.empty?
@@ -581,7 +584,10 @@ def generate_sparkle_appcast!(tag_name:)
   capture_command!(*args, error_message: "Failed to generate Sparkle appcast")
   UI.user_error!("Expected #{sparkle_appcast_path}") unless File.exist?(sparkle_appcast_path)
 
-  delta_tags = Dir[File.join(sparkle_updates_dir, "*.delta")].to_h { |path| [File.basename(path), tag_name] }
+  current_build = ENV.fetch("OMACY_ARCHIVE_BASENAME").split("-").last
+  delta_tags = Dir[File.join(sparkle_updates_dir, "*.delta")]
+    .select { |path| ReleaseAutomation.delta_targets_build?(filename: File.basename(path), build: current_build) }
+    .to_h { |path| [File.basename(path), tag_name] }
   rewritten = ReleaseAutomation.rewrite_appcast_enclosures(
     content: File.read(sparkle_appcast_path),
     repo: repo,
@@ -598,13 +604,13 @@ def sparkle_github_assets(tag_name:)
     zip_path,
     sparkle_appcast_path
   ]
-  current_zip = File.basename(zip_path)
+  current_build = ENV.fetch("OMACY_ARCHIVE_BASENAME").split("-").last
   Dir[File.join(sparkle_updates_dir, "*.delta")].each do |delta|
+    next unless ReleaseAutomation.delta_targets_build?(filename: File.basename(delta), build: current_build)
+
     assets << delta
     sparkle_filename_to_tag[File.basename(delta)] = tag_name
   end
-  Dir[File.join(sparkle_updates_dir, "*.md")].each { |notes| assets << notes }
-  _ = current_zip
   assets
 end
 

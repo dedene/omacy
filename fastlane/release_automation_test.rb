@@ -82,4 +82,9 @@ delta_rewritten = ReleaseAutomation.rewrite_appcast_enclosures(
 )
 assert_equal '<enclosure url="https://github.com/dedene/omacy/releases/download/v0.1.1/Omacy23-24.delta" />', delta_rewritten
 
+assert ReleaseAutomation.delta_targets_build?(filename: "Omacy42-40.delta", build: "42")
+assert ReleaseAutomation.delta_targets_build?(filename: "Omacy42-37.delta", build: 42)
+assert_equal false, ReleaseAutomation.delta_targets_build?(filename: "Omacy40-37.delta", build: "42")
+assert_equal false, ReleaseAutomation.delta_targets_build?(filename: "Omacy-0.1.1-42.zip", build: "42")
+
 puts "ok"

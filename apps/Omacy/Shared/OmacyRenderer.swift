@@ -436,8 +436,6 @@ final class OmacyRenderer: NSObject {
         var cfg = OmacySessionConfig()
         let artBytes = Array(art.utf8)
         let effectBytes = Array(settings.effect.utf8)
-        let dir = pinnedContent == nil ? OmacyStore.containerURL?.path : nil
-        let dirBytes = dir.map { Array($0.utf8) }
         var created = false
         artBytes.withUnsafeBufferPointer { artPtr in
             effectBytes.withUnsafeBufferPointer { effectPtr in
@@ -450,15 +448,7 @@ final class OmacyRenderer: NSObject {
                 cfg.bg_b = bg.2
                 cfg.bg_a = bg.3
                 cfg.has_seed = 0
-                if let dirBytes {
-                    dirBytes.withUnsafeBufferPointer { dirPtr in
-                        cfg.config_dir = dirPtr.baseAddress
-                        cfg.config_dir_len = dirBytes.count
-                        created = finishCreate(&cfg, cols: cols, rows: rows)
-                    }
-                } else {
-                    created = finishCreate(&cfg, cols: cols, rows: rows)
-                }
+                created = finishCreate(&cfg, cols: cols, rows: rows)
             }
         }
         return created

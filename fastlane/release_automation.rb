@@ -122,6 +122,10 @@ module ReleaseAutomation
     match ? release_tag(match[1]) : nil
   end
 
+  def delta_targets_build?(filename:, build:)
+    /\AOmacy#{Regexp.escape(build.to_s)}-\d+\.delta\z/.match?(filename.to_s)
+  end
+
   def rewrite_appcast_enclosures(content:, repo:, filename_to_tag:)
     content.gsub(/url="[^"]+\/([^"\/]+)"/) do
       filename = Regexp.last_match(1)

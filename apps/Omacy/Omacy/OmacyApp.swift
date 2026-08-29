@@ -21,10 +21,7 @@ struct OmacyApp: App {
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(after: .appInfo) {
-                Button("Check for Updates…") {
-                    SparkleUpdater.shared.checkForUpdates()
-                }
-                .disabled(!SparkleUpdater.shared.canCheckForUpdates)
+                CheckForUpdatesCommand()
             }
         }
 

@@ -1,6 +1,5 @@
 import Foundation
 import AppKit
-import Darwin
 
 enum OmacyEffects {
     /// Keep in lockstep with `ttfx::effects::EffectCommand::NAMES`.
@@ -66,49 +65,21 @@ extension Notification.Name {
 enum OmacyStore {
     static let appGroup = "group.be.zenjoy.omacy"
     static let forceCanaryKey = "omacy.forceCanary"
+    private static let sharedSettingsKey = "settingsJSON"
+    private static let sharedArtKey = "screensaverArt"
 
     private static var lastGoodSettings = OmacySettings()
     private static var lastGoodArt: String?
     static private(set) var lastLoadError: String?
 
-    static var containerURL: URL? { readableConfigDirectories().first }
+    static var containerURL: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
+    }
 
     static var settingsURL: URL? { containerURL?.appendingPathComponent("settings.json") }
     static var artURL: URL? { containerURL?.appendingPathComponent("screensaver.txt") }
 
-    /// ScreenSaverEngine often denies the official App Group API even though
-    /// the host wrote the files. Walk known locations, using the real home
-    /// directory (sandbox `homeDirectoryForCurrentUser` is the container).
-    static func readableConfigDirectories() -> [URL] {
-        configDirectoryCandidates().filter { dir in
-            let art = dir.appendingPathComponent("screensaver.txt")
-            return FileManager.default.isReadableFile(atPath: art.path)
-                || FileManager.default.isReadableFile(atPath: dir.path)
-        }
-    }
-
-    static func configDirectoryCandidates() -> [URL] {
-        var dirs: [URL] = []
-        var seen = Set<String>()
-        func add(_ url: URL?) {
-            guard let url else { return }
-            let path = url.standardizedFileURL.path
-            guard seen.insert(path).inserted else { return }
-            dirs.append(url)
-        }
-        add(FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup))
-        let home = realHomeURL()
-        add(home.appendingPathComponent("Library/Group Containers/\(appGroup)", isDirectory: true))
-        add(home.appendingPathComponent("Library/Application Support/Omacy", isDirectory: true))
-        return dirs
-    }
-
-    private static func realHomeURL() -> URL {
-        if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir {
-            return URL(fileURLWithPath: String(cString: dir), isDirectory: true)
-        }
-        return FileManager.default.homeDirectoryForCurrentUser
-    }
+    private static var sharedDefaults: UserDefaults? { UserDefaults(suiteName: appGroup) }
 
     static var bundledArt: String {
         if let url = Bundle.main.url(forResource: "screensaver", withExtension: "txt", subdirectory: nil)
@@ -125,13 +96,13 @@ enum OmacyStore {
     }
 
     static func loadSettings() -> OmacySettings {
-        guard let url = configDirectoryCandidates()
-            .map({ $0.appendingPathComponent("settings.json") })
-            .first(where: { FileManager.default.isReadableFile(atPath: $0.path) })
-        else { return lastGoodSettings }
-        guard FileManager.default.fileExists(atPath: url.path) else { return lastGoodSettings }
+        let sharedData = sharedDefaults?.data(forKey: sharedSettingsKey)
+        let data = sharedData ?? settingsURL.flatMap { try? Data(contentsOf: $0) }
+        guard let data else { return lastGoodSettings }
+        if sharedData == nil {
+            sharedDefaults?.set(data, forKey: sharedSettingsKey)
+        }
         do {
-            let data = try Data(contentsOf: url)
             guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 lastLoadError = "settings.json is invalid; keeping last-known-good"
                 return lastGoodSettings
@@ -163,13 +134,15 @@ enum OmacyStore {
     }
 
     static func loadArt() -> String {
-        for dir in configDirectoryCandidates() {
-            let url = dir.appendingPathComponent("screensaver.txt")
-            if let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty {
-                lastGoodArt = text
-                lastLoadError = nil
-                return text
+        let sharedText = sharedDefaults?.string(forKey: sharedArtKey)
+        let text = sharedText ?? artURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+        if let text, !text.isEmpty {
+            if sharedText == nil {
+                sharedDefaults?.set(text, forKey: sharedArtKey)
             }
+            lastGoodArt = text
+            lastLoadError = nil
+            return text
         }
         if let lastGoodArt { return lastGoodArt }
         return bundledArt
@@ -188,25 +161,19 @@ enum OmacyStore {
             "invert": settings.invert
         ]
         let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
-        let artData = Data(art.utf8)
-        var wrote = false
-        var lastWriteError: Error?
-        for dir in configDirectoryCandidates() {
-            do {
-                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-                try atomicWrite(data, to: dir.appendingPathComponent("settings.json"))
-                try atomicWrite(artData, to: dir.appendingPathComponent("screensaver.txt"))
-                wrote = true
-            } catch {
-                lastWriteError = error
-            }
-        }
-        guard wrote else {
-            throw lastWriteError ?? NSError(
+        guard let defaults = sharedDefaults else {
+            throw NSError(
                 domain: "Omacy",
                 code: 1,
                 userInfo: [NSLocalizedDescriptionKey: "App Group container missing"]
             )
+        }
+        defaults.set(data, forKey: sharedSettingsKey)
+        defaults.set(art, forKey: sharedArtKey)
+        if let dir = containerURL {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try atomicWrite(data, to: dir.appendingPathComponent("settings.json"))
+            try atomicWrite(Data(art.utf8), to: dir.appendingPathComponent("screensaver.txt"))
         }
         lastGoodSettings = settings
         lastGoodArt = art

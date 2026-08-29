@@ -1,9 +1,13 @@
 import AppKit
+import Combine
 import Sparkle
+import SwiftUI
 
 @MainActor
-final class SparkleUpdater: NSObject {
+final class SparkleUpdater: NSObject, ObservableObject {
     static let shared = SparkleUpdater()
+
+    @Published private(set) var canCheckForUpdates = false
 
     private var controller: SPUStandardUpdaterController?
 
@@ -11,21 +15,37 @@ final class SparkleUpdater: NSObject {
         Bundle.main.sparkleFeedURLString != nil && Bundle.main.sparklePublicEDKey != nil
     }
 
-    var canCheckForUpdates: Bool {
-        controller?.updater.canCheckForUpdates ?? false
+    override init() {
+        super.init()
+        start()
     }
 
     func start() {
         guard isEnabled, controller == nil else { return }
-        controller = SPUStandardUpdaterController(
+        let controller = SPUStandardUpdaterController(
             startingUpdater: true,
             updaterDelegate: nil,
             userDriverDelegate: nil
         )
+        self.controller = controller
+        controller.updater.publisher(for: \.canCheckForUpdates)
+            .assign(to: &$canCheckForUpdates)
     }
 
     func checkForUpdates() {
-        controller?.checkForUpdates(nil)
+        controller?.updater.checkForUpdates()
+    }
+}
+
+/// Intermediate view so the menu item's disabled state updates (Sparkle SwiftUI setup).
+struct CheckForUpdatesCommand: View {
+    @ObservedObject private var updater = SparkleUpdater.shared
+
+    var body: some View {
+        Button("Check for Updates…") {
+            updater.checkForUpdates()
+        }
+        .disabled(!updater.canCheckForUpdates)
     }
 }
 
