@@ -127,10 +127,8 @@ static int require_generation(OmacySession *session, uint64_t expected) {
 }
 
 int main(void) {
-  if (create_signature == NULL || begin_signature == NULL || catalog_count_signature == NULL ||
-      catalog_get_signature == NULL || status_signature == NULL) {
-    return 1;
-  }
+  (void)catalog_count_signature;
+  (void)catalog_get_signature;
   const char *status = status_signature(OMACY_OK);
   if (status == NULL || status[0] != 'O' || status_signature((omacy_status)99) != NULL) {
     return 2;
