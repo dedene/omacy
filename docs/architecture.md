@@ -93,7 +93,7 @@ Three drawing contexts:
 ## Repo layout
 
 ```
-omacy-screensaver/
+omacy/
   apps/Omacy/              Xcode: host + appex + OmacyRenderer
   crates/omacy-engine/     session, FFI, ascii module, links ttfx
   vendor/ttfx/             git submodule, pinned commit + our patches

@@ -38,7 +38,7 @@ See [architecture](docs/architecture.md), [FFI](docs/ffi.md), and [parity](docs/
 
 Requires macOS 15 (Sequoia) or later.
 
-1. Build the app (see [Build](#build)), or use a signed build from [Releases](https://github.com/dedene/omacy-screensaver/releases) when one exists.
+1. Build the app (see [Build](#build)), or use a signed build from [Releases](https://github.com/dedene/omacy/releases) when one exists.
 2. Put `Omacy.app` in `/Applications`.
 3. Open Omacy and register the screensaver.
 4. Enable it from the app, or in System Settings → Screen Saver.
