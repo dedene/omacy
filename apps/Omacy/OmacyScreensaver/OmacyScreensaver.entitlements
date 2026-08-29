@@ -16,5 +16,10 @@
 		<string>com.apple.CoreDisplay.master</string>
 		<string>com.apple.ViewBridgeAuxiliary</string>
 	</array>
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
+	<array>
+		<string>/Library/Group Containers/group.be.zenjoy.omacy/</string>
+		<string>/Library/Application Support/Omacy/</string>
+	</array>
 </dict>
 </plist>

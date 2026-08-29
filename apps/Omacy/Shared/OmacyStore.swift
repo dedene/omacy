@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import Darwin
 
 enum OmacyEffects {
     /// Keep in lockstep with `ttfx::effects::EffectCommand::NAMES`.
@@ -70,12 +71,44 @@ enum OmacyStore {
     private static var lastGoodArt: String?
     static private(set) var lastLoadError: String?
 
-    static var containerURL: URL? {
-        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
-    }
+    static var containerURL: URL? { readableConfigDirectories().first }
 
     static var settingsURL: URL? { containerURL?.appendingPathComponent("settings.json") }
     static var artURL: URL? { containerURL?.appendingPathComponent("screensaver.txt") }
+
+    /// ScreenSaverEngine often denies the official App Group API even though
+    /// the host wrote the files. Walk known locations, using the real home
+    /// directory (sandbox `homeDirectoryForCurrentUser` is the container).
+    static func readableConfigDirectories() -> [URL] {
+        configDirectoryCandidates().filter { dir in
+            let art = dir.appendingPathComponent("screensaver.txt")
+            return FileManager.default.isReadableFile(atPath: art.path)
+                || FileManager.default.isReadableFile(atPath: dir.path)
+        }
+    }
+
+    static func configDirectoryCandidates() -> [URL] {
+        var dirs: [URL] = []
+        var seen = Set<String>()
+        func add(_ url: URL?) {
+            guard let url else { return }
+            let path = url.standardizedFileURL.path
+            guard seen.insert(path).inserted else { return }
+            dirs.append(url)
+        }
+        add(FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup))
+        let home = realHomeURL()
+        add(home.appendingPathComponent("Library/Group Containers/\(appGroup)", isDirectory: true))
+        add(home.appendingPathComponent("Library/Application Support/Omacy", isDirectory: true))
+        return dirs
+    }
+
+    private static func realHomeURL() -> URL {
+        if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir {
+            return URL(fileURLWithPath: String(cString: dir), isDirectory: true)
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+    }
 
     static var bundledArt: String {
         if let url = Bundle.main.url(forResource: "screensaver", withExtension: "txt", subdirectory: nil)
@@ -92,7 +125,10 @@ enum OmacyStore {
     }
 
     static func loadSettings() -> OmacySettings {
-        guard let url = settingsURL else { return lastGoodSettings }
+        guard let url = configDirectoryCandidates()
+            .map({ $0.appendingPathComponent("settings.json") })
+            .first(where: { FileManager.default.isReadableFile(atPath: $0.path) })
+        else { return lastGoodSettings }
         guard FileManager.default.fileExists(atPath: url.path) else { return lastGoodSettings }
         do {
             let data = try Data(contentsOf: url)
@@ -127,9 +163,11 @@ enum OmacyStore {
     }
 
     static func loadArt() -> String {
-        if let url = artURL {
+        for dir in configDirectoryCandidates() {
+            let url = dir.appendingPathComponent("screensaver.txt")
             if let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty {
                 lastGoodArt = text
+                lastLoadError = nil
                 return text
             }
         }
@@ -138,10 +176,6 @@ enum OmacyStore {
     }
 
     static func save(settings: OmacySettings, art: String) throws {
-        guard let dir = containerURL else {
-            throw NSError(domain: "Omacy", code: 1, userInfo: [NSLocalizedDescriptionKey: "App Group container missing"])
-        }
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         var settings = settings
         settings.syncEngineEffect()
         let payload: [String: Any] = [
@@ -154,8 +188,26 @@ enum OmacyStore {
             "invert": settings.invert
         ]
         let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
-        try atomicWrite(data, to: settingsURL!)
-        try atomicWrite(Data(art.utf8), to: artURL!)
+        let artData = Data(art.utf8)
+        var wrote = false
+        var lastWriteError: Error?
+        for dir in configDirectoryCandidates() {
+            do {
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                try atomicWrite(data, to: dir.appendingPathComponent("settings.json"))
+                try atomicWrite(artData, to: dir.appendingPathComponent("screensaver.txt"))
+                wrote = true
+            } catch {
+                lastWriteError = error
+            }
+        }
+        guard wrote else {
+            throw lastWriteError ?? NSError(
+                domain: "Omacy",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "App Group container missing"]
+            )
+        }
         lastGoodSettings = settings
         lastGoodArt = art
         lastLoadError = nil

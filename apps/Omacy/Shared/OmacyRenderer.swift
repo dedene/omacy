@@ -224,21 +224,11 @@ final class OmacyRenderer: NSObject {
         fontSize = resolvedFontSize()
         cachedFont = OmacyFont.makeFont(size: fontSize)
         forceRepack = true
-        guard let session else { return }
-        var cfg = OmacyPendingConfig()
-        lastArt.withCString { ptr in
-            cfg.ascii = UnsafeRawPointer(ptr).assumingMemoryBound(to: UInt8.self)
-            cfg.ascii_len = lastArt.utf8.count
-            lastSettings.effect.withCString { eptr in
-                cfg.effect = UnsafeRawPointer(eptr).assumingMemoryBound(to: UInt8.self)
-                cfg.effect_len = lastSettings.effect.utf8.count
-                let bg = lastSettings.backgroundRGBA
-                cfg.bg_r = bg.0
-                cfg.bg_g = bg.1
-                cfg.bg_b = bg.2
-                cfg.bg_a = bg.3
-                _ = omacy_session_set_pending_config(session, &cfg)
-            }
+        let nextCols = pendingCols ?? cols
+        let nextRows = pendingRows ?? rows
+        if createSession(cols: nextCols, rows: nextRows, settings: lastSettings, art: lastArt) {
+            cols = nextCols
+            rows = nextRows
         }
         updateGeometry()
     }
