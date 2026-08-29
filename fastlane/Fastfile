@@ -56,7 +56,16 @@ end
 
 def read_one_password_reference!(reference, label:)
   ensure_one_password_ready!
-  capture_command!("op", "read", "--no-newline", reference, error_message: "Failed to read #{label} from 1Password")
+  capture_command!(*op_cli("read", "--no-newline", reference), error_message: "Failed to read #{label} from 1Password")
+end
+
+def op_account
+  account = ENV["OP_ACCOUNT"].to_s.strip
+  account.empty? ? "zenjoy.1password.com" : account
+end
+
+def op_cli(*args)
+  ["op", "--account", op_account, *args]
 end
 
 def hydrate_release_env_from_one_password!
@@ -69,7 +78,7 @@ def hydrate_release_env_from_one_password!
   return if item.empty?
 
   ensure_one_password_ready!
-  args = ["op", "item", "get", item, "--format", "json", "--reveal"]
+  args = op_cli("item", "get", item, "--format", "json", "--reveal")
   vault = ENV["OP_RELEASE_ENV_VAULT"].to_s.strip
   args += ["--vault", vault] unless vault.empty?
   payload = JSON.parse(capture_command!(*args, error_message: "Failed to read release env from 1Password"))
@@ -209,6 +218,7 @@ def ensure_release_tools_ready!
   UI.user_error!("create-dmg must be installed (brew install create-dmg)") unless command_success?("which", "create-dmg")
   required_env!("MATCH_PASSWORD")
   resolve_asc_key_filepath
+  sparkle_generate_appcast_binary!
 end
 
 def determine_release_channel(options)
@@ -362,7 +372,8 @@ def archive_release!(version:, build_number:)
       "ONLY_ACTIVE_ARCH=YES",
       "EXCLUDED_ARCHS=x86_64",
       "MARKETING_VERSION=#{Shellwords.escape(version)}",
-      "CURRENT_PROJECT_VERSION=#{Shellwords.escape(build_number)}"
+      "CURRENT_PROJECT_VERSION=#{Shellwords.escape(build_number)}",
+      "SPARKLE_PUBLIC_ED_KEY=#{Shellwords.escape(sparkle_public_ed_key)}"
     ].join(" ")
   )
 end
@@ -439,6 +450,163 @@ def notarize_release_dmg!
   )
   FileUtils.cp(dmg_path, ENV.fetch("OMACY_GITHUB_DMG_PATH"))
   UI.success("DMG notarized and stapled: #{dmg_path}")
+end
+
+def sparkle_updates_dir
+  project_root_path("build", "updates")
+end
+
+def sparkle_appcast_path
+  File.join(sparkle_updates_dir, "appcast.xml")
+end
+
+def sparkle_tools_root
+  project_root_path("build", "sparkle-tools")
+end
+
+def sparkle_public_ed_key
+  key = File.read(project_root_path(PBXPROJ))[/SPARKLE_PUBLIC_ED_KEY = "?([^";]+)"?;/, 1].to_s.strip
+  UI.user_error!("SPARKLE_PUBLIC_ED_KEY is not set in the Xcode project") if key.empty?
+  key
+end
+
+def sparkle_private_ed_key_file
+  default_file = project_root_path("build", "omacy-sparkle-ed25519.txt")
+  return default_file if File.file?(default_file)
+
+  explicit = resolved_env_value("OMACY_SPARKLE_PRIVATE_ED_KEY_FILE")
+  return explicit unless explicit.empty?
+
+  inline = resolved_env_value("OMACY_SPARKLE_PRIVATE_ED_KEY")
+  return "" if inline.empty?
+
+  @omacy_sparkle_private_ed_key_tempfile ||= begin
+    file = Tempfile.new(["omacy-sparkle-private-ed25519", ".txt"])
+    file.write("#{inline}\n")
+    file.flush
+    File.chmod(0o600, file.path)
+    file
+  end
+  @omacy_sparkle_private_ed_key_tempfile.path
+end
+
+def sparkle_generate_appcast_binary!
+  binary = File.join(sparkle_tools_root, "bin", "generate_appcast")
+  return binary if File.executable?(binary)
+
+  FileUtils.mkdir_p(sparkle_tools_root)
+  archive = File.join(sparkle_tools_root, "Sparkle-2.9.6.tar.xz")
+  unless File.exist?(archive)
+    UI.message("Downloading Sparkle 2.9.6 tools")
+    capture_command!(
+      "gh", "release", "download", "2.9.6",
+      "--repo", "sparkle-project/Sparkle",
+      "--pattern", "Sparkle-2.9.6.tar.xz",
+      "--dir", sparkle_tools_root,
+      error_message: "Failed to download Sparkle tools"
+    )
+  end
+  capture_command!(
+    "tar", "-xJf", archive, "-C", sparkle_tools_root,
+    error_message: "Failed to extract Sparkle tools"
+  )
+  UI.user_error!("Expected generate_appcast at #{binary}") unless File.executable?(binary)
+  binary
+end
+
+def package_release_zip!
+  version = get_info_plist_value(path: built_app_plist, key: "CFBundleShortVersionString")
+  build = get_info_plist_value(path: built_app_plist, key: "CFBundleVersion")
+  basename = ReleaseAutomation.archive_basename(app_name: APP_NAME, version: version, build: build)
+  abs_zip = project_root_path(BUILD_DIR, "#{basename}.zip")
+  FileUtils.rm_f(abs_zip)
+  sh("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", project_root_path(APP_PATH), abs_zip)
+  ENV["OMACY_ZIP_PATH"] = abs_zip
+  ENV["OMACY_ARCHIVE_BASENAME"] = basename
+  UI.success("ZIP created: #{abs_zip}")
+end
+
+def sparkle_filename_to_tag
+  @sparkle_filename_to_tag ||= {}
+end
+
+def download_previous_sparkle_zips!
+  FileUtils.mkdir_p(sparkle_updates_dir)
+  github_release_records.each do |release|
+    next if release["isDraft"]
+
+    tag = release["tagName"].to_s.strip
+    next if tag.empty?
+
+    Dir.mktmpdir("omacy-sparkle-#{tag}") do |dir|
+      stdout, stderr, status = run_command(
+        "gh", "release", "download", tag,
+        "--pattern", "Omacy-*.zip",
+        "--dir", dir,
+        "--clobber"
+      )
+      next unless status.success?
+
+      Dir[File.join(dir, "Omacy-*.zip")].each do |zip|
+        destination = File.join(sparkle_updates_dir, File.basename(zip))
+        FileUtils.cp(zip, destination)
+        sparkle_filename_to_tag[File.basename(zip)] = tag
+      end
+      _ = stdout
+      _ = stderr
+    end
+  end
+end
+
+def stage_sparkle_update!(tag_name:)
+  zip_path = ENV.fetch("OMACY_ZIP_PATH")
+  FileUtils.mkdir_p(sparkle_updates_dir)
+  FileUtils.cp(zip_path, File.join(sparkle_updates_dir, File.basename(zip_path)))
+  sparkle_filename_to_tag[File.basename(zip_path)] = tag_name
+  notes_path = File.join(sparkle_updates_dir, "#{File.basename(zip_path, ".zip")}.md")
+  FileUtils.cp(project_root_path(BUILD_DIR, "release-notes.md"), notes_path) if File.exist?(project_root_path(BUILD_DIR, "release-notes.md"))
+end
+
+def generate_sparkle_appcast!(tag_name:)
+  FileUtils.mkdir_p(sparkle_updates_dir)
+  repo = github_repo_name_with_owner
+  args = [
+    sparkle_generate_appcast_binary!,
+    "--download-url-prefix", "https://github.com/#{repo}/releases/latest/download/",
+    "--maximum-versions", "0"
+  ]
+  key_file = sparkle_private_ed_key_file
+  args += ["--ed-key-file", key_file] unless key_file.empty?
+  args += ["--account", "omacy"] if key_file.empty?
+  args << sparkle_updates_dir
+
+  capture_command!(*args, error_message: "Failed to generate Sparkle appcast")
+  UI.user_error!("Expected #{sparkle_appcast_path}") unless File.exist?(sparkle_appcast_path)
+
+  delta_tags = Dir[File.join(sparkle_updates_dir, "*.delta")].to_h { |path| [File.basename(path), tag_name] }
+  rewritten = ReleaseAutomation.rewrite_appcast_enclosures(
+    content: File.read(sparkle_appcast_path),
+    repo: repo,
+    filename_to_tag: sparkle_filename_to_tag.merge(delta_tags)
+  )
+  File.write(sparkle_appcast_path, rewritten)
+  UI.success("Sparkle appcast ready -> #{sparkle_appcast_path}")
+end
+
+def sparkle_github_assets(tag_name:)
+  zip_path = ENV.fetch("OMACY_ZIP_PATH")
+  assets = [
+    ENV.fetch("OMACY_GITHUB_DMG_PATH"),
+    zip_path,
+    sparkle_appcast_path
+  ]
+  current_zip = File.basename(zip_path)
+  Dir[File.join(sparkle_updates_dir, "*.delta")].each do |delta|
+    assets << delta
+    sparkle_filename_to_tag[File.basename(delta)] = tag_name
+  end
+  _ = current_zip
+  assets
 end
 
 def local_tag_release!(tag_name, version)
@@ -544,18 +712,22 @@ def run_release_pipeline(options)
   archive_release!(version: version, build_number: build_number)
   restore_release_metadata_files!
   notarize_app_bundle!
+  package_release_zip!
   package_release_dmg!
   notarize_release_dmg!
 
   local_tag_release!(tag_name, version)
   notes_path = prepare_release_notes!(tag_name: tag_name, version: version)
+  download_previous_sparkle_zips!
+  stage_sparkle_update!(tag_name: tag_name)
+  generate_sparkle_appcast!(tag_name: tag_name)
   push_release!(tag_name)
   upsert_github_release!(
     tag_name: tag_name,
     version: version,
     channel: channel,
     notes_path: notes_path,
-    asset_paths: [ENV.fetch("OMACY_GITHUB_DMG_PATH")]
+    asset_paths: sparkle_github_assets(tag_name: tag_name)
   )
 
   UI.success("Published #{release_title(version)}: https://github.com/#{github_repo_name_with_owner}/releases/tag/#{tag_name}")
@@ -587,6 +759,11 @@ platform :mac do
   desc "Notarize the exported .app"
   lane :notarize_app do
     notarize_app_bundle!
+  end
+
+  desc "Create a Sparkle ZIP from the exported .app"
+  lane :package_zip do
+    package_release_zip!
   end
 
   desc "Create a DMG from the exported .app"

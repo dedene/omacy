@@ -56,6 +56,9 @@
 		1A0000B7000000000000000A /* OmacyCanaryAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00009D000000000000000B /* OmacyCanaryAnimator.swift */; };
 		1A0000E0000000000000000A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000E0000000000000000B /* Assets.xcassets */; };
 		1A0000E2000000000000000A /* Omacy.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000E2000000000000000B /* Omacy.icon */; };
+		1A000080000000000000000A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 1A000085000000000000000B /* Sparkle */; };
+		1A000081000000000000000A /* Sparkle in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 1A000085000000000000000B /* Sparkle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		1A000082000000000000000A /* SparkleUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000083000000000000000B /* SparkleUpdater.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -78,6 +81,17 @@
 				1A000007000000000000000A /* OmacyScreensaver.appex in Embed PlugIns */,
 			);
 			name = "Embed PlugIns";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1A000086000000000000000A /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				1A000081000000000000000A /* Sparkle in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -125,6 +139,7 @@
 		1A00009D000000000000000B /* OmacyCanaryAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyCanaryAnimator.swift; sourceTree = "<group>"; };
 		1A0000E0000000000000000B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1A0000E2000000000000000B /* Omacy.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = Omacy.icon; path = ../../assets/Omacy.icon; sourceTree = SOURCE_ROOT; };
+		1A000083000000000000000B /* SparkleUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparkleUpdater.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -133,6 +148,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1A000070000000000000000A /* PaperSaverKit in Frameworks */,
+				1A000080000000000000000A /* Sparkle in Frameworks */,
 				1A0000B2000000000000000A /* Metal.framework in Frameworks */,
 				1A0000B4000000000000000A /* libomacy_engine.a in Frameworks */,
 			);
@@ -168,6 +184,7 @@
 			children = (
 				1A000065000000000000000C /* Helpers */,
 				1A000001000000000000000B /* OmacyApp.swift */,
+				1A000083000000000000000B /* SparkleUpdater.swift */,
 				1A000002000000000000000B /* ContentView.swift */,
 				1A000032000000000000000B /* PluginManager.swift */,
 				1A000095000000000000000B /* OmacyHostView.swift */,
@@ -283,6 +300,7 @@
 				1A000012000000000000000A /* Frameworks */,
 				1A00001D000000000000000A /* Resources */,
 				1A000009000000000000000A /* Embed PlugIns */,
+				1A000086000000000000000A /* Embed Frameworks */,
 				1A000042000000000000000A /* Register Extensions */,
 			);
 			buildRules = (
@@ -293,6 +311,7 @@
 			name = Omacy;
 			packageProductDependencies = (
 				1A000070000000000000000B /* PaperSaverKit */,
+				1A000085000000000000000B /* Sparkle */,
 			);
 			productName = Omacy;
 			productReference = 1A00000C000000000000000B /* Omacy.app */;
@@ -327,6 +346,7 @@
 			mainGroup = 1A000014000000000000000C;
 			packageReferences = (
 				1A000071000000000000000A /* XCRemoteSwiftPackageReference "PaperSaver" */,
+				1A000084000000000000000A /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			productRefGroup = 1A000018000000000000000C /* Products */;
 			projectDirPath = "";
@@ -411,6 +431,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1A000001000000000000000A /* OmacyApp.swift in Sources */,
+				1A000082000000000000000A /* SparkleUpdater.swift in Sources */,
 				1A000002000000000000000A /* ContentView.swift in Sources */,
 				1A000032000000000000000A /* PluginManager.swift in Sources */,
 				1A000066000000000000000A /* Logger.swift in Sources */,
@@ -604,6 +625,7 @@
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = be.zenjoy.omacy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SPARKLE_PUBLIC_ED_KEY = "5rAI6MpJGyTHqXkIr7VkMT5MBWolp3PxL/F57JT2BtI=";
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/OmacyScreensaver",
@@ -653,6 +675,7 @@
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = be.zenjoy.omacy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SPARKLE_PUBLIC_ED_KEY = "5rAI6MpJGyTHqXkIr7VkMT5MBWolp3PxL/F57JT2BtI=";
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/OmacyScreensaver",
@@ -835,6 +858,14 @@
 				version = 0.2.0;
 			};
 		};
+		1A000084000000000000000A /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.6;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -842,6 +873,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1A000071000000000000000A /* XCRemoteSwiftPackageReference "PaperSaver" */;
 			productName = PaperSaverKit;
+		};
+		1A000085000000000000000B /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A000084000000000000000A /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

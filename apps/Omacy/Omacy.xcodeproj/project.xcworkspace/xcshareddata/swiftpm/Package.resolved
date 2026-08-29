@@ -1,5 +1,5 @@
 {
-  "originHash" : "58d483173683d9748f852a167c8263542e3ef789aabcff2c1cc4cc0b5dad32d0",
+  "originHash" : "b935d90f48c8e6f7672b4ae0719172808cdb8aba4195648970ddd6e27ce94752",
   "pins" : [
     {
       "identity" : "papersaver",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "1f10d1537fdfa2df8165b46572a9de491ce2d084",
         "version" : "0.2.0"
+      }
+    },
+    {
+      "identity" : "sparkle",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sparkle-project/Sparkle",
+      "state" : {
+        "revision" : "ac2def288cbff5cfc7df3ffef6abdf45b72bcb0a",
+        "version" : "2.9.6"
       }
     },
     {

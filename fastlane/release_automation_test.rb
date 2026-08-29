@@ -62,5 +62,24 @@ assert_equal "CURRENT_PROJECT_VERSION = 42\n", ReleaseAutomation.replace_xcconfi
 notes = ReleaseAutomation.first_release_notes(version: "0.1.0")
 assert_match(/Omacy 0\.1\.0/, notes)
 assert_match(/macOS 15/, notes)
+assert_match(/Sparkle/, notes)
+
+assert_equal "v0.1.0", ReleaseAutomation.sparkle_zip_tag("Omacy-0.1.0-23.zip")
+assert_equal "v0.1.1-beta.1", ReleaseAutomation.sparkle_zip_tag("Omacy-0.1.1-beta.1-24.zip")
+assert_nil ReleaseAutomation.sparkle_zip_tag("appcast.xml")
+
+rewritten = ReleaseAutomation.rewrite_appcast_enclosures(
+  content: '<enclosure url="https://example.invalid/Omacy-0.1.0-23.zip" />',
+  repo: "dedene/omacy",
+  filename_to_tag: {}
+)
+assert_equal '<enclosure url="https://github.com/dedene/omacy/releases/download/v0.1.0/Omacy-0.1.0-23.zip" />', rewritten
+
+delta_rewritten = ReleaseAutomation.rewrite_appcast_enclosures(
+  content: '<enclosure url="file:///tmp/Omacy23-24.delta" />',
+  repo: "dedene/omacy",
+  filename_to_tag: { "Omacy23-24.delta" => "v0.1.1" }
+)
+assert_equal '<enclosure url="https://github.com/dedene/omacy/releases/download/v0.1.1/Omacy23-24.delta" />', delta_rewritten
 
 puts "ok"

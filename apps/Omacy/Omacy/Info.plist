@@ -28,5 +28,13 @@
 	<string>Copyright 2026 Peter Dedene. Effects by Terminal Text Effects (ChrisBuilds), Rust engine ttfx.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/dedene/omacy/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>$(SPARKLE_PUBLIC_ED_KEY)</string>
 </dict>
 </plist>

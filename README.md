@@ -46,6 +46,8 @@ The host will not register the extension from a random folder. Mixing Xcode Deri
 
 Builds are signed and notarized by Zenjoy BV. Requires macOS 15 (Sequoia) or later.
 
+Once installed, Omacy updates itself from GitHub Releases via [Sparkle](https://sparkle-project.org).
+
 ## Status
 
 Omacy is in active development. The Rust engine is tested in CI. The host app and screensaver extension compile on macOS 26.

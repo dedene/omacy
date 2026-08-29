@@ -71,7 +71,9 @@ Maintainers ship a signed GitHub release with:
 bundle exec fastlane release
 ```
 
-That archives a Developer ID build, notarizes a DMG, tags, and publishes `Omacy.dmg`. Pass `version:0.1.1` to skip the version prompt. Pass `channel:beta` for a prerelease.
+That archives a Developer ID build, notarizes a DMG, signs a Sparkle appcast, tags, and publishes `Omacy.dmg` plus `appcast.xml` to GitHub Releases. Pass `version:0.1.1` to skip the version prompt. Pass `channel:beta` for a prerelease.
+
+The Sparkle feed is `https://github.com/dedene/omacy/releases/latest/download/appcast.xml`. No extra host. The repo must stay public or Sparkle cannot fetch updates.
 
 ## Licensing Expectations
 

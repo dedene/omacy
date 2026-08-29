@@ -107,8 +107,26 @@ module ReleaseAutomation
       - All 37 effects on a Metal cell grid
       - Paste ASCII, or convert a PNG or SVG to block or Braille
       - Signed and notarized Developer ID build
+      - In-app updates via Sparkle from GitHub Releases
 
       Requires macOS 15 (Sequoia) or later. Put `Omacy.app` in `/Applications`, then register and enable it from the host.
     NOTES
+  end
+
+  def github_release_asset_url(repo:, tag:, filename:)
+    "https://github.com/#{repo}/releases/download/#{tag}/#{filename}"
+  end
+
+  def sparkle_zip_tag(filename)
+    match = /\AOmacy-(.+)-(\d+)\.zip\z/.match(filename.to_s)
+    match ? release_tag(match[1]) : nil
+  end
+
+  def rewrite_appcast_enclosures(content:, repo:, filename_to_tag:)
+    content.gsub(/url="[^"]+\/([^"\/]+)"/) do
+      filename = Regexp.last_match(1)
+      tag = filename_to_tag[filename] || sparkle_zip_tag(filename)
+      tag ? %(url="#{github_release_asset_url(repo: repo, tag: tag, filename: filename)}") : Regexp.last_match(0)
+    end
   end
 end

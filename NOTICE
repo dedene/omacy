@@ -21,5 +21,8 @@ License. The original MIT license is preserved at apps/Omacy/LICENSE.
 This product uses PaperSaverKit (https://github.com/AerialScreensaver/PaperSaver)
 to register and enable the screensaver from the host app.
 
+This product uses Sparkle (https://github.com/sparkle-project/Sparkle)
+for in-app updates, Copyright (c) Sparkle Project, MIT License.
+
 The bundled screensaver font is Fairfax HD, Copyright (c) 2017–2020 Kreative
 Software, licensed under the SIL Open Font License 1.1. See assets/fonts/OFL.txt.
