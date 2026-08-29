@@ -34,7 +34,7 @@
 	<key>SSEHasConfigureSheet</key>
 	<true/>
 	<key>SSENeedsAnimationTimer</key>
-	<false/>
+	<true/>
 	<key>ScreenSaverConfigurationSheetViewControllerClass</key>
 	<string>$(PRODUCT_MODULE_NAME).OmacyConfigurationViewController</string>
 	<key>ScreenSaverViewControllerClass</key>

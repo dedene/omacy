@@ -15,6 +15,7 @@ final class OmacySaverView: ScreenSaverView {
         logger.info("init(frame: \(frame.size.width, privacy: .public)x\(frame.size.height, privacy: .public), isPreview: \(isPreview))")
         super.init(frame: frame, isPreview: isPreview)
         wantsLayer = true
+        layerContentsRedrawPolicy = .onSetNeedsDisplay
         autoresizingMask = [.width, .height]
         animationTimeInterval = 1.0 / 60.0
         renderer.onEngineUnavailable = { [weak self] in
@@ -25,6 +26,7 @@ final class OmacySaverView: ScreenSaverView {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         wantsLayer = true
+        layerContentsRedrawPolicy = .onSetNeedsDisplay
         autoresizingMask = [.width, .height]
         renderer.onEngineUnavailable = { [weak self] in
             self?.switchToCanary()
@@ -37,9 +39,27 @@ final class OmacySaverView: ScreenSaverView {
     }
 
     override func startAnimation() {
-        logger.info("startAnimation()")
+        logger.info("startAnimation() isPreview=\(self.isPreview) bounds=\(self.bounds.size.width, privacy: .public)x\(self.bounds.size.height, privacy: .public)")
         super.startAnimation()
-        attemptSettledStart()
+        if looksLikePreview {
+            start()
+        } else {
+            attemptSettledStart()
+        }
+    }
+
+    override func animateOneFrame() {
+        if looksLikePreview {
+            needsDisplay = true
+        }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        if looksLikePreview {
+            drawPreviewArt()
+            return
+        }
+        super.draw(dirtyRect)
     }
 
     override func stopAnimation() {
@@ -61,8 +81,12 @@ final class OmacySaverView: ScreenSaverView {
             }
             observeScreen(window)
             if !started {
-                scheduleSettledFallback()
-                attemptSettledStart()
+                if looksLikePreview {
+                    start()
+                } else {
+                    scheduleSettledFallback()
+                    attemptSettledStart()
+                }
             }
         } else {
             teardown()
@@ -105,12 +129,24 @@ final class OmacySaverView: ScreenSaverView {
         start()
     }
 
+    /// Tahoe's Settings preview often has `isPreview == false` on a small
+    /// hosted view. Full-screen idle is the only path that should wait to match
+    /// the display.
+    private var looksLikePreview: Bool {
+        if isPreview { return true }
+        if bounds.width > 0, bounds.width < 500 { return true }
+        if let screen = window?.screen {
+            return bounds.width < screen.frame.width * 0.5
+                || bounds.height < screen.frame.height * 0.5
+        }
+        return false
+    }
+
     /// ScreenSaverEngine parks every saver window on the main display, then
     /// migrates it (~30–200 ms) and resizes. Starting before that settle
     /// sizes every session to `NSScreen.main`.
     private func geometryLooksSettled() -> Bool {
-        if isPreview { return bounds.width >= 1 && bounds.height >= 1 }
-        if bounds.width > 0 && bounds.width < 400 { return true }
+        if looksLikePreview { return bounds.width >= 1 && bounds.height >= 1 }
         guard let screen = window?.screen else { return false }
         return abs(bounds.width - screen.frame.width) < 8
             && abs(bounds.height - screen.frame.height) < 8
@@ -132,24 +168,55 @@ final class OmacySaverView: ScreenSaverView {
         started = true
         settledFallback?.cancel()
         settledFallback = nil
-        let preview = isPreview || (bounds.width > 0 && bounds.width < 400)
         let scale = OmacyLayout.backingScale(for: self)
-        logger.info("start() preview=\(preview) bounds=\(self.bounds.size.width, privacy: .public)x\(self.bounds.size.height, privacy: .public) scale=\(scale, privacy: .public)")
-        switch renderer.attach(to: self, isPreview: preview) {
+        logger.info("start() isPreview=\(self.isPreview) looksLikePreview=\(self.looksLikePreview) bounds=\(self.bounds.size.width, privacy: .public)x\(self.bounds.size.height, privacy: .public) scale=\(scale, privacy: .public)")
+        // Settings snapshots the view. Metal sublayers and replacing
+        // `self.layer` both present black there. Preview uses `draw(_:)`.
+        if looksLikePreview {
+            usingCanary = true
+            needsDisplay = true
+            return
+        }
+        switch renderer.attach(to: self, isPreview: false) {
         case .engine:
             usingCanary = false
-            // Next turn: layout / screen-change in this turn can still resize
-            // the unpresented session to the real display.
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.started, !self.usingCanary else { return }
-                self.renderer.start()
-            }
+            renderer.start()
         case .canary:
             switchToCanary()
         }
     }
 
+    private func drawPreviewArt() {
+        let settings = OmacyStore.loadSettings()
+        let rgba = settings.backgroundRGBA
+        NSColor(
+            srgbRed: CGFloat(rgba.0) / 255,
+            green: CGFloat(rgba.1) / 255,
+            blue: CGFloat(rgba.2) / 255,
+            alpha: CGFloat(rgba.3) / 255
+        ).setFill()
+        bounds.fill()
+
+        let art = OmacyStore.loadArt()
+        let fontSize = OmacyLayout.fittingFontSize(art: art, in: bounds.size, cap: 18)
+        let font = OmacyFont.makeFont(size: fontSize)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.white
+        ]
+        let textSize = art.size(withAttributes: attrs)
+        let origin = CGPoint(
+            x: max((bounds.width - textSize.width) / 2, 8),
+            y: max((bounds.height - textSize.height) / 2, 8)
+        )
+        art.draw(in: CGRect(origin: origin, size: textSize), withAttributes: attrs)
+    }
+
     private func refreshGeometry() {
+        if looksLikePreview {
+            needsDisplay = true
+            return
+        }
         let scale = OmacyLayout.backingScale(for: self)
         if usingCanary {
             canary.updateBounds(bounds, scale: scale)

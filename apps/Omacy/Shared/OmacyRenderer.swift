@@ -518,8 +518,11 @@ final class OmacyRenderer: NSObject {
 
     private func resolvedFontSize() -> CGFloat {
         let cap = CGFloat(lastSettings.fontSize)
-        guard let view, pinnedContent != nil else { return cap }
-        return OmacyLayout.fittingFontSize(art: lastArt, in: view.bounds.size, cap: cap)
+        guard let view else { return cap }
+        if pinnedContent != nil || isPreview {
+            return OmacyLayout.fittingFontSize(art: lastArt, in: view.bounds.size, cap: cap)
+        }
+        return cap
     }
 
     private func loadContent() {
