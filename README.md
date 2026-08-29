@@ -19,11 +19,7 @@
   </p>
 </p>
 
-<div align="center">
-
 https://github.com/user-attachments/assets/7a06339a-486d-4488-86fa-a3b8095cb3a1
-
-</div>
 
 ## Features
 
