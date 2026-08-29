@@ -603,6 +603,7 @@ def sparkle_github_assets(tag_name:)
     assets << delta
     sparkle_filename_to_tag[File.basename(delta)] = tag_name
   end
+  Dir[File.join(sparkle_updates_dir, "*.md")].each { |notes| assets << notes }
   _ = current_zip
   assets
 end
