@@ -9,99 +9,102 @@
 //
 
 import Foundation
+import AppKit
 import PaperSaverKit
 
 private let logger = AppexLog.logger("PluginManager")
 
-struct OmacyUpdateRecovery {
-    let currentIdentity: String
-    let storedIdentity: () -> String?
-    let isActiveScreensaver: () -> Bool
-    let registerExtension: () throws -> Void
-    let restartWallpaperAgent: () throws -> Void
-    let recordIdentity: (String) -> Void
+struct OmacyPluginRegistration: Equatable {
+    let path: String
+    let version: String?
+}
 
-    func reconcile() throws {
-        guard storedIdentity() != currentIdentity else { return }
-        if isActiveScreensaver() {
-            try registerExtension()
-            try restartWallpaperAgent()
+enum OmacyRegistrationState: Equatable {
+    case notRegistered
+    case missingRegistrations([OmacyPluginRegistration])
+    case registered(OmacyPluginRegistration)
+    case conflictingRegistrations([OmacyPluginRegistration])
+
+    static func classify(
+        _ registrations: [OmacyPluginRegistration],
+        fileExists: (String) -> Bool
+    ) -> Self {
+        let sorted = registrations.sorted {
+            ($0.path, $0.version ?? "") < ($1.path, $1.version ?? "")
+        }.reduce(into: [OmacyPluginRegistration]()) { unique, registration in
+            if unique.last != registration { unique.append(registration) }
         }
-        recordIdentity(currentIdentity)
+        guard !sorted.isEmpty else { return .notRegistered }
+        let live = sorted.filter { fileExists($0.path) }
+        if live.isEmpty { return .missingRegistrations(sorted) }
+        guard sorted.count == 1 else { return .conflictingRegistrations(sorted) }
+        return .registered(sorted[0])
+    }
+
+    var isMissing: Bool {
+        if case .missingRegistrations = self { return true }
+        return false
+    }
+
+    var hasConflicts: Bool {
+        if case .conflictingRegistrations = self { return true }
+        return false
+    }
+
+    func isRegistered(at embeddedPath: String?) -> Bool {
+        guard let embeddedPath, case .registered(let registration) = self else { return false }
+        return registration.path == embeddedPath
+    }
+
+    func pathsToRemoveBeforeInstalling(at embeddedPath: String) throws -> [String] {
+        switch self {
+        case .notRegistered:
+            return []
+        case .missingRegistrations(let registrations):
+            return registrations.map(\.path).filter { $0 != embeddedPath }
+        case .registered(let registration):
+            return registration.path == embeddedPath ? [] : [registration.path]
+        case .conflictingRegistrations:
+            throw PluginError.conflictingRegistrations
+        }
+    }
+
+    var registrationsNeedingRepair: [OmacyPluginRegistration]? {
+        switch self {
+        case .missingRegistrations(let registrations),
+             .conflictingRegistrations(let registrations):
+            return registrations.sorted { $0.path < $1.path }
+        case .notRegistered, .registered:
+            return nil
+        }
     }
 }
 
-enum OmacyUpdateRecoveryLauncher {
-    private static let recordedIdentityKey = "lastReconciledScreensaverIdentity"
-    private static let activeNames: Set<String> = [
+enum OmacyScreensaverIdentity {
+    static let aliases: Set<String> = [
         "Omacy", "OmacyScreensaver", "be.zenjoy.omacy.screensaver",
     ]
 
-    static func reconcileAfterLaunch(
-        bundle: Bundle = .main,
-        defaults: UserDefaults = .standard
-    ) {
-        guard bundle.bundlePath.hasPrefix("/Applications/"),
-              let extensionURL = bundle.builtInPlugInsURL?
-                .appendingPathComponent("OmacyScreensaver.appex"),
-              let extensionBundle = Bundle(url: extensionURL),
-              let shortVersion = extensionBundle.object(
-                forInfoDictionaryKey: "CFBundleShortVersionString"
-              ) as? String,
-              let buildVersion = extensionBundle.object(
-                forInfoDictionaryKey: "CFBundleVersion"
-              ) as? String else { return }
+    static func isOmacy(_ value: String) -> Bool { aliases.contains(value) }
+}
 
-        let identity = "\(shortVersion):\(buildVersion)"
-        let recovery = OmacyUpdateRecovery(
-            currentIdentity: identity,
-            storedIdentity: { defaults.string(forKey: recordedIdentityKey) },
-            isActiveScreensaver: {
-                PaperSaver().getActiveScreensavers().contains { activeNames.contains($0) }
-            },
-            registerExtension: {
-                try runProcess(
-                    "/usr/bin/pluginkit", arguments: ["-a", extensionURL.path],
-                    acceptedStatuses: [0]
-                )
-            },
-            restartWallpaperAgent: {
-                // PaperSaver uses the same field-proven refresh after changing
-                // screen saver configuration. Status 1 means no agent was running.
-                try runProcess(
-                    "/usr/bin/killall", arguments: ["WallpaperAgent"],
-                    acceptedStatuses: [0, 1]
-                )
-            },
-            recordIdentity: { defaults.set($0, forKey: recordedIdentityKey) }
-        )
+enum OmacyCurrentDisplayStatus: Equatable {
+    case inactive(displayCount: Int)
+    case activeOnSome(activeCount: Int, displayCount: Int)
+    case activeOnAll(displayCount: Int)
 
-        do {
-            try recovery.reconcile()
-        } catch {
-            logger.error("Update reconciliation failed: \(error.localizedDescription, privacy: .public)")
+    static func classify(_ screensaverNames: [String]) -> Self {
+        let activeCount = screensaverNames.count(where: OmacyScreensaverIdentity.isOmacy)
+        guard activeCount > 0 else { return .inactive(displayCount: screensaverNames.count) }
+        guard activeCount == screensaverNames.count else {
+            return .activeOnSome(activeCount: activeCount, displayCount: screensaverNames.count)
         }
+        return .activeOnAll(displayCount: screensaverNames.count)
     }
 
-    private static func runProcess(
-        _ path: String,
-        arguments: [String],
-        acceptedStatuses: Set<Int32>
-    ) throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = arguments
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try process.run()
-        process.waitUntilExit()
-        guard acceptedStatuses.contains(process.terminationStatus) else {
-            throw NSError(
-                domain: "be.zenjoy.omacy.update-recovery",
-                code: Int(process.terminationStatus),
-                userInfo: [NSLocalizedDescriptionKey: "\(path) exited with status \(process.terminationStatus)"]
-            )
-        }
+    var isActiveOnAllCurrentDisplays: Bool {
+        if case .activeOnAll(let count) = self { return count > 0 }
+        return false
     }
 }
 
@@ -113,25 +116,31 @@ class PluginManager: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var lastError: String?
     @Published var registeredPaths: [String] = []
+    @Published private(set) var registrationState: OmacyRegistrationState = .notRegistered
 
     /// Registered with PlugInKit but the appex file is gone.
     var isPluginMissing: Bool {
-        guard isInstalled else { return false }
-        guard let path = installedPath, !path.isEmpty else { return true }
-        return !FileManager.default.fileExists(atPath: path)
+        registrationState.isMissing
     }
 
     /// PlugInKit is sticky if DerivedData and /Applications are both registered.
     var hasConflictingRegistrations: Bool {
-        registeredPaths.count > 1
+        registrationState.hasConflicts
+    }
+
+    var isCurrentExtensionInstalled: Bool {
+        registrationState.isRegistered(at: embeddedExtensionPath)
     }
 
     @Published var isActiveScreensaver: Bool = false
     @Published var isCheckingScreensaver: Bool = false
     @Published var screensaverError: String?
+    @Published private(set) var currentDisplayStatus: OmacyCurrentDisplayStatus = .inactive(displayCount: 0)
 
     private let bundleIdentifier = "be.zenjoy.omacy.screensaver"
     private let paperSaver = PaperSaver()
+    private let processRunner: OmacyProcessRunner
+    private let loadingActivity = LoadingActivityCounter()
     private let screensaverDisplayName = "Omacy"
 
     /// PaperSaver looks up modules by the `.appex` filename, not CFBundleDisplayName.
@@ -166,80 +175,78 @@ class PluginManager: ObservableObject {
         return version
     }
 
-    init() {
+    init(processRunner: OmacyProcessRunner = OmacyProcessRunner()) {
+        self.processRunner = processRunner
         checkInstallationStatus()
         checkScreensaverStatus()
     }
 
     /// Check if the extension is registered with pluginkit.
     func checkInstallationStatus() {
-        isLoading = true
-        lastError = nil
-
+        beginLoading()
         Task {
+            defer { self.endLoading() }
             do {
-                let matches = try await queryPluginKit()
-                await MainActor.run {
-                    self.registeredPaths = matches.map(\.path).compactMap { $0 }
-                    self.isInstalled = !matches.isEmpty
-                    self.installedPath = matches.first?.path
-                    self.installedVersion = matches.first?.version
-                    self.isLoading = false
-                    if matches.count > 1 {
-                        self.lastError = "Registered in more than one place. Unregister extras so only /Applications or DerivedData remains."
-                    }
-                }
+                _ = try await refreshRegistrationState()
             } catch {
-                await MainActor.run {
-                    self.isInstalled = false
-                    self.installedPath = nil
-                    self.installedVersion = nil
-                    self.registeredPaths = []
-                    self.isLoading = false
-                    self.lastError = error.localizedDescription
-                }
+                self.registrationState = .notRegistered
+                self.isInstalled = false
+                self.installedPath = nil
+                self.installedVersion = nil
+                self.registeredPaths = []
+                self.lastError = error.localizedDescription
             }
         }
-    }
-
-    private struct PluginMatch {
-        var path: String?
-        var version: String?
     }
 
     /// Query pluginkit for our extension's registration status.
     /// Line format we look for:
     ///   `+    be.zenjoy.omacy.screensaver(0.1.0) <path>`
-    private func queryPluginKit() async throws -> [PluginMatch] {
-        let output = try runProcess("/usr/bin/pluginkit", arguments: ["-m", "-v", "-p", "com.apple.screensaver"])
+    private func queryPluginKit() async throws -> [OmacyPluginRegistration] {
+        let result = try await runProcessResult(
+            "/usr/bin/pluginkit",
+            arguments: ["-m", "-v", "-p", "com.apple.screensaver"]
+        )
+        return try OmacyPluginQuery.parse(result, bundleIdentifier: bundleIdentifier)
+    }
 
-        var matches: [PluginMatch] = []
-        let lines = output.components(separatedBy: "\n")
-        for line in lines {
-            if line.contains(bundleIdentifier) {
-                logger.info("Found extension in pluginkit output: \(line, privacy: .public)")
-
-                var version: String?
-                if let versionStart = line.firstIndex(of: "("),
-                   let versionEnd = line.firstIndex(of: ")") {
-                    let start = line.index(after: versionStart)
-                    version = String(line[start..<versionEnd])
-                }
-
-                var path: String?
-                if let pathStart = line.range(of: "/", options: [], range: line.startIndex..<line.endIndex) {
-                    path = String(line[pathStart.lowerBound...])
-                }
-
-                matches.append(PluginMatch(path: path, version: version))
+    @discardableResult
+    func refreshRegistrationState() async throws -> OmacyRegistrationState {
+        beginLoading()
+        defer { endLoading() }
+        return try await {
+            lastError = nil
+            let matches = try await queryPluginKit()
+            let registrations = matches.sorted {
+                ($0.path, $0.version ?? "") < ($1.path, $1.version ?? "")
             }
-        }
-
-        return matches
+            let state = OmacyRegistrationState.classify(
+                registrations,
+                fileExists: FileManager.default.fileExists(atPath:)
+            )
+            registrationState = state
+            registeredPaths = registrations.map(\.path)
+            isInstalled = !registrations.isEmpty
+            switch state {
+            case .registered(let registration):
+                installedPath = registration.path
+                installedVersion = registration.version
+            case .missingRegistrations(let registrations):
+                installedPath = registrations.first?.path
+                installedVersion = registrations.first?.version
+            case .notRegistered, .conflictingRegistrations:
+                installedPath = nil
+                installedVersion = nil
+            }
+            if case .conflictingRegistrations = state {
+                lastError = "Registered in more than one place. Repair registration before continuing."
+            }
+            return state
+        }()
     }
 
     /// Install the embedded extension by handing it to pluginkit.
-    func install() throws {
+    func install() async throws {
         guard allowedInstallLocation() else {
             throw PluginError.notInApplications
         }
@@ -253,24 +260,32 @@ class PluginManager: ObservableObject {
 
         logger.info("Installing extension from: \(extensionPath, privacy: .public)")
 
-        isLoading = true
+        beginLoading()
+        defer { endLoading() }
         lastError = nil
 
         do {
-            _ = try runProcess("/usr/bin/pluginkit", arguments: ["-a", extensionPath])
+            for stalePath in try registrationState.pathsToRemoveBeforeInstalling(at: extensionPath) {
+                try await unregisterRegistration(at: stalePath)
+            }
+            try await runProcessRequiringSuccess(
+                "/usr/bin/pluginkit", arguments: ["-a", extensionPath]
+            )
             logger.info("Extension installed successfully")
 
-            checkInstallationStatus()
+            let refreshed = try await refreshRegistrationState()
+            guard refreshed.isRegistered(at: extensionPath) else {
+                throw PluginError.registrationVerificationFailed
+            }
             checkScreensaverStatus()
         } catch {
-            isLoading = false
             lastError = error.localizedDescription
             throw error
         }
     }
 
     /// Uninstall every registered copy, then the embedded path as a fallback.
-    func uninstall() throws {
+    func uninstall() async throws {
         var paths = registeredPaths
         if paths.isEmpty {
             if let installed = installedPath, !installed.isEmpty {
@@ -282,31 +297,31 @@ class PluginManager: ObservableObject {
             }
         }
 
-        isLoading = true
+        beginLoading()
+        defer { endLoading() }
         lastError = nil
 
         do {
             for extensionPath in paths {
                 logger.info("Uninstalling extension at: \(extensionPath, privacy: .public)")
-                _ = try runProcess("/usr/bin/pluginkit", arguments: ["-r", extensionPath])
+                try await runProcessRequiringSuccess(
+                    "/usr/bin/pluginkit", arguments: ["-r", extensionPath]
+                )
             }
             logger.info("Extension uninstalled successfully")
-            checkInstallationStatus()
+            _ = try await refreshRegistrationState()
         } catch {
-            isLoading = false
             lastError = error.localizedDescription
             throw error
         }
     }
 
-    /// Check if our screensaver is the active screensaver on any display.
+    /// Check Omacy on the current space of every currently connected display.
     func checkScreensaverStatus() {
         isCheckingScreensaver = true
         screensaverError = nil
-
-        let activeScreensavers = paperSaver.getActiveScreensavers()
-        let names: Set<String> = [paperSaverModuleName, screensaverDisplayName]
-        isActiveScreensaver = activeScreensavers.contains { names.contains($0) }
+        currentDisplayStatus = inspectCurrentDisplayStatus()
+        isActiveScreensaver = currentDisplayStatus.isActiveOnAllCurrentDisplays
         isCheckingScreensaver = false
     }
 
@@ -326,6 +341,113 @@ class PluginManager: ObservableObject {
         }
     }
 
+    /// Prepare the registered extension and current display configuration for a real test.
+    func prepareForScreenSaverTest() async throws {
+        beginLoading()
+        isCheckingScreensaver = true
+        lastError = nil
+        screensaverError = nil
+        defer {
+            endLoading()
+            isCheckingScreensaver = false
+        }
+        guard let embeddedExtensionPath else {
+            throw PluginError.embeddedExtensionNotFound
+        }
+        let preparation = ScreenSaverPreparation(
+            embeddedPath: embeddedExtensionPath,
+            refreshRegistration: { [weak self] in
+                guard let self else { throw PluginError.managerUnavailable }
+                return try await self.refreshRegistrationState()
+            },
+            unregisterRegistration: { [weak self] path in
+                guard let self else { throw PluginError.managerUnavailable }
+                try await self.unregisterRegistration(at: path)
+            },
+            registerEmbeddedExtension: { [weak self] in
+                guard let self else { throw PluginError.managerUnavailable }
+                try await self.registerEmbeddedExtension()
+            },
+            inspectCurrentDisplays: { [weak self] in
+                guard let self else { throw PluginError.managerUnavailable }
+                let status = self.inspectCurrentDisplayStatus()
+                self.currentDisplayStatus = status
+                self.isActiveScreensaver = status.isActiveOnAllCurrentDisplays
+                return status
+            },
+            activateOnAllDisplaysAndSpaces: { [weak self] in
+                guard let self else { throw PluginError.managerUnavailable }
+                try await self.activateOnAllDisplaysAndSpaces()
+            }
+        )
+        do {
+            try await preparation.prepare()
+        } catch {
+            lastError = error.localizedDescription
+            throw error
+        }
+    }
+
+    /// Explicitly remove stale or duplicate registrations and register this app's extension.
+    func repairRegistration() async throws {
+        beginLoading()
+        lastError = nil
+        defer { endLoading() }
+        let repair = RegistrationRepair(
+            unregister: { [weak self] path in
+                guard let self else { throw PluginError.managerUnavailable }
+                try await self.runProcessRequiringSuccess(
+                    "/usr/bin/pluginkit", arguments: ["-r", path]
+                )
+            },
+            registerEmbeddedExtension: { [weak self] in
+                guard let self else { throw PluginError.managerUnavailable }
+                try await self.registerEmbeddedExtension()
+            },
+            refreshRegistration: { [weak self] in
+                guard let self else { throw PluginError.managerUnavailable }
+                return try await self.refreshRegistrationState()
+            }
+        )
+        do {
+            guard let embeddedExtensionPath else { throw PluginError.embeddedExtensionNotFound }
+            try await repair.repair(
+                registrationState,
+                embeddedPath: embeddedExtensionPath
+            )
+        } catch {
+            lastError = error.localizedDescription
+            throw error
+        }
+    }
+
+    private func registerEmbeddedExtension() async throws {
+        guard allowedInstallLocation() else { throw PluginError.notInApplications }
+        guard let path = embeddedExtensionPath,
+              FileManager.default.fileExists(atPath: path) else {
+            throw PluginError.embeddedExtensionNotFound
+        }
+        try await runProcessRequiringSuccess("/usr/bin/pluginkit", arguments: ["-a", path])
+    }
+
+    private func unregisterRegistration(at path: String) async throws {
+        guard path != embeddedExtensionPath else { return }
+        try await runProcessRequiringSuccess("/usr/bin/pluginkit", arguments: ["-r", path])
+    }
+
+    private func activateOnAllDisplaysAndSpaces() async throws {
+        try await paperSaver.setScreensaverEverywhere(module: paperSaverModuleName)
+    }
+
+    private func inspectCurrentDisplayStatus() -> OmacyCurrentDisplayStatus {
+        let names = NSScreen.screens.map { screen -> String in
+            guard let info = paperSaver.getActiveScreensaver(for: screen) else { return "" }
+            if OmacyScreensaverIdentity.isOmacy(info.identifier) { return info.identifier }
+            return info.name
+        }
+        return .classify(names)
+    }
+
     private func allowedInstallLocation() -> Bool {
         let path = Bundle.main.bundlePath
         if path.hasPrefix("/Applications/") { return true }
@@ -333,30 +455,38 @@ class PluginManager: ObservableObject {
         return false
     }
 
+    private func beginLoading() {
+        loadingActivity.begin()
+        isLoading = loadingActivity.isActive
+    }
+
+    private func endLoading() {
+        loadingActivity.end()
+        isLoading = loadingActivity.isActive
+    }
+
     /// Run a subprocess and return its combined stdout/stderr.
-    private func runProcess(_ path: String, arguments: [String]) throws -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = arguments
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-
-        try process.run()
-        process.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
-
-        logger.debug("Process output: \(output, privacy: .public)")
-
-        if process.terminationStatus != 0 {
-            // pluginkit returns non-zero when no matches are found, so don't treat it as fatal.
-            logger.warning("Process exited with status: \(process.terminationStatus)")
+    private func runProcessRequiringSuccess(
+        _ path: String,
+        arguments: [String]
+    ) async throws {
+        let result = try await runProcessResult(path, arguments: arguments)
+        if result.status != 0 {
+            logger.warning("Process exited with status: \(result.status)")
+            throw PluginError.processFailed(path, result.status, result.output)
         }
+    }
 
-        return output
+    private func runProcessResult(
+        _ path: String,
+        arguments: [String]
+    ) async throws -> OmacyPluginProcessResult {
+        let result = try await processRunner.run(
+            executableURL: URL(fileURLWithPath: path),
+            arguments: arguments
+        )
+        logger.debug("Process output: \(result.output, privacy: .public)")
+        return result
     }
 }
 
@@ -366,6 +496,12 @@ enum PluginError: LocalizedError {
     case installationFailed(String)
     case uninstallationFailed(String)
     case notInApplications
+    case conflictingRegistrations
+    case registrationVerificationFailed
+    case activationVerificationFailed
+    case managerUnavailable
+    case processFailed(String, Int32, String)
+    case registrationDoesNotNeedRepair
 
     var errorDescription: String? {
         switch self {
@@ -379,6 +515,19 @@ enum PluginError: LocalizedError {
             return "Uninstallation failed: \(message)"
         case .notInApplications:
             return "Move Omacy.app to /Applications, then register. The host will not register from a random path."
+        case .conflictingRegistrations:
+            return "Omacy is registered in more than one place. Repair registration before testing."
+        case .registrationVerificationFailed:
+            return "Omacy's screen saver extension could not be verified after registration."
+        case .activationVerificationFailed:
+            return "Omacy couldn't be made active on every current display."
+        case .managerUnavailable:
+            return "Screen saver setup is no longer available."
+        case .processFailed(let path, let status, let output):
+            let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            return "\(path) exited with status \(status)\(detail.isEmpty ? "" : ": \(detail)")"
+        case .registrationDoesNotNeedRepair:
+            return "Omacy's registration does not need repair."
         }
     }
 }

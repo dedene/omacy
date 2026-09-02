@@ -136,9 +136,9 @@ final class OmacySettingsTests: XCTestCase {
         XCTAssertEqual(OmacyLoginHomeDirectory.current().path, expectedPath)
     }
 
-    func testUpdateRecoveryRegistersBeforeRestartingAndThenRecordsIdentity() throws {
+    func testUpdateRecoveryRegistersBeforeRestartingAndThenRecordsIdentity() async throws {
         var events: [String] = []
-        let recovery = OmacyUpdateRecovery(
+        try await OmacyUpdateRecovery.reconcile(
             currentIdentity: "0.1.3:45",
             storedIdentity: { "0.1.2:44" },
             isActiveScreensaver: { true },
@@ -147,14 +147,12 @@ final class OmacySettingsTests: XCTestCase {
             recordIdentity: { events.append("record:\($0)") }
         )
 
-        try recovery.reconcile()
-
         XCTAssertEqual(events, ["register", "restart", "record:0.1.3:45"])
     }
 
-    func testUpdateRecoveryRecordsInactiveBootstrapWithoutRestartingServices() throws {
+    func testUpdateRecoveryRecordsInactiveBootstrapWithoutRestartingServices() async throws {
         var events: [String] = []
-        let recovery = OmacyUpdateRecovery(
+        try await OmacyUpdateRecovery.reconcile(
             currentIdentity: "0.1.3:45",
             storedIdentity: { nil },
             isActiveScreensaver: { false },
@@ -163,23 +161,21 @@ final class OmacySettingsTests: XCTestCase {
             recordIdentity: { events.append("record:\($0)") }
         )
 
-        try recovery.reconcile()
-
         XCTAssertEqual(events, ["record:0.1.3:45"])
     }
 
-    func testUpdateRecoveryDoesNotRecordFailedReconciliation() {
+    func testUpdateRecoveryDoesNotRecordFailedReconciliation() async {
         var recordedIdentity: String?
-        let recovery = OmacyUpdateRecovery(
-            currentIdentity: "0.1.3:45",
-            storedIdentity: { "0.1.2:44" },
-            isActiveScreensaver: { true },
-            registerExtension: { throw CocoaError(.fileNoSuchFile) },
-            restartWallpaperAgent: {},
-            recordIdentity: { recordedIdentity = $0 }
+        await XCTAssertUpdateRecoveryThrows(
+            try await OmacyUpdateRecovery.reconcile(
+                currentIdentity: "0.1.3:45",
+                storedIdentity: { "0.1.2:44" },
+                isActiveScreensaver: { true },
+                registerExtension: { throw CocoaError(.fileNoSuchFile) },
+                restartWallpaperAgent: {},
+                recordIdentity: { recordedIdentity = $0 }
+            )
         )
-
-        XCTAssertThrowsError(try recovery.reconcile())
         XCTAssertNil(recordedIdentity)
     }
 
@@ -384,6 +380,44 @@ final class OmacySettingsTests: XCTestCase {
                 "case \(index)"
             )
         }
+    }
+
+    func testMissingPublicAndCachedConfigurationLoadsBootstrapDefaultsWithoutDiagnostic() {
+        let snapshot = makeRepository().load()
+
+        XCTAssertEqual(snapshot.settings, OmacySettings())
+        XCTAssertEqual(snapshot.art, "BUNDLED")
+        XCTAssertEqual(snapshot.origin, .bootstrapDefaults)
+        XCTAssertNil(snapshot.diagnostic)
+    }
+
+    func testMalformedPublicConfigurationIsNotTreatedAsBootstrapDefaults() throws {
+        let repository = makeRepository()
+        try FileManager.default.createDirectory(
+            at: repository.paths.configDirectory, withIntermediateDirectories: true
+        )
+        try Data("{".utf8).write(to: repository.paths.settingsURL)
+
+        let snapshot = repository.load()
+
+        XCTAssertEqual(snapshot.origin, .recoveredDefaults)
+        XCTAssertNotNil(snapshot.diagnostic)
+    }
+
+    func testRejectedPublicSymlinkIsNotTreatedAsAFilelessFreshInstall() throws {
+        let repository = makeRepository()
+        try FileManager.default.createDirectory(
+            at: repository.paths.configDirectory, withIntermediateDirectories: true
+        )
+        try FileManager.default.createSymbolicLink(
+            at: repository.paths.settingsURL,
+            withDestinationURL: repository.paths.configDirectory.appendingPathComponent("missing")
+        )
+
+        let snapshot = repository.load()
+
+        XCTAssertEqual(snapshot.origin, .recoveredDefaults)
+        XCTAssertNotNil(snapshot.diagnostic)
     }
 
     func testSaveRejectsInvalidArtBeforePublishingSettings() throws {
@@ -604,4 +638,15 @@ final class OmacySettingsTests: XCTestCase {
     private func json(_ object: [String: Any]) throws -> Data {
         try JSONSerialization.data(withJSONObject: object)
     }
+}
+
+private func XCTAssertUpdateRecoveryThrows(
+    _ expression: @autoclosure () async throws -> Void,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) async {
+    do {
+        try await expression()
+        XCTFail("Expected an error", file: file, line: line)
+    } catch {}
 }

@@ -73,6 +73,19 @@ final class OmacyLayoutTests: XCTestCase {
         XCTAssertTrue(OmacyLayout.drawableSizeChanged(current: CGSize(width: 100, height: 100), proposed: CGSize(width: 101, height: 100)))
     }
 
+    func testArtCanvasColumnPreviewHeightAccountsForCaptionBottomPadding() {
+        // Mirrors ArtCanvasColumn's layout arithmetic: previewH must absorb the
+        // caption's bottom padding so editorH + previewH + captionH + padding
+        // exactly fills the available height (no overflow/clipping).
+        let availableHeight: CGFloat = 700
+        let editorH = ArtMetrics.editorHeight(availableHeight: availableHeight)
+        let captionH = ArtMetrics.captionHeight
+        let captionBottomPadding = ArtMetrics.captionBottomPadding
+        let previewH = max(120, availableHeight - editorH - captionH - captionBottomPadding)
+
+        XCTAssertEqual(editorH + previewH + captionH + captionBottomPadding, availableHeight)
+    }
+
     func testFittingFontHonorsCapWithDeterministicBinarySearchResult() {
         XCTAssertEqual(
             OmacyLayout.fittingFontSize(art: "M", in: CGSize(width: 2_000, height: 2_000), cap: 20),

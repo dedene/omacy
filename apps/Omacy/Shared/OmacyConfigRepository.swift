@@ -60,10 +60,30 @@ struct OmacyConfigPaths {
     }
 }
 
+enum OmacyConfigOrigin: Equatable {
+    case publicConfiguration
+    case recoveredConfiguration
+    case bootstrapDefaults
+    case recoveredDefaults
+}
+
 struct OmacyConfigSnapshot: Equatable {
     let settings: OmacySettings
     let art: String
     let diagnostic: String?
+    let origin: OmacyConfigOrigin
+
+    init(
+        settings: OmacySettings,
+        art: String,
+        diagnostic: String?,
+        origin: OmacyConfigOrigin = .publicConfiguration
+    ) {
+        self.settings = settings
+        self.art = art
+        self.diagnostic = diagnostic
+        self.origin = origin
+    }
 }
 
 enum OmacyBoundaryConfiguration {
@@ -142,7 +162,12 @@ final class OmacyConfigRepository {
             } else {
                 diagnostic = nil
             }
-            return .init(settings: memorySettings, art: memoryArt, diagnostic: diagnostic)
+            return .init(
+                settings: memorySettings,
+                art: memoryArt,
+                diagnostic: diagnostic,
+                origin: diagnostic == nil ? .publicConfiguration : .recoveredConfiguration
+            )
         }
 
         let cachedSettings = readSettings(at: paths.cachedSettingsURL)
@@ -156,7 +181,18 @@ final class OmacyConfigRepository {
             lastGoodArt = art
             return .init(
                 settings: settings, art: art,
-                diagnostic: "Public configuration is invalid; using private last-known-good cache"
+                diagnostic: "Public configuration is invalid; using private last-known-good cache",
+                origin: .recoveredConfiguration
+            )
+        }
+
+        let hasAnyConfigurationFile = [
+            paths.settingsURL, paths.artURL, paths.cachedSettingsURL, paths.cachedArtURL,
+        ].contains { configurationNodeExists(at: $0) }
+        if !hasAnyConfigurationFile {
+            return .init(
+                settings: OmacySettings(), art: bundledArtProvider(), diagnostic: nil,
+                origin: .bootstrapDefaults
             )
         }
 
@@ -169,8 +205,8 @@ final class OmacyConfigRepository {
             diagnostic = "No valid public or cached configuration; using bundled defaults"
         }
         return .init(
-            settings: memorySettings ?? OmacySettings(),
-            art: memoryArt ?? bundledArtProvider(), diagnostic: diagnostic
+            settings: memorySettings ?? OmacySettings(), art: memoryArt ?? bundledArtProvider(),
+            diagnostic: diagnostic, origin: .recoveredDefaults
         )
     }
 
@@ -247,6 +283,11 @@ final class OmacyConfigRepository {
             at: url, maximumBytes: OmacySettingsCodec.maximumJSONBytes
         ) else { return nil }
         return OmacySettingsCodec.decodeValidated(data)
+    }
+
+    private func configurationNodeExists(at url: URL) -> Bool {
+        var info = stat()
+        return url.path.withCString { lstat($0, &info) == 0 }
     }
 
     private func readArt(at url: URL) -> String? {

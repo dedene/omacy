@@ -1,58 +1,50 @@
+import AppKit
 import SwiftUI
 
 extension Notification.Name {
-    static let omacyOpenArt = Notification.Name("be.zenjoy.omacy.openArt")
+    static let omacyOpenWorkspace = Notification.Name("be.zenjoy.omacy.openWorkspace")
 }
 
-@main
-struct OmacyApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @Environment(\.openWindow) private var openWindow
+enum OmacyAppRoute: Equatable {
+    case workspace
 
-    var body: some Scene {
-        WindowGroup(id: "main") {
-            ContentView()
-                .onOpenURL(perform: handleOpenURL)
-                .onReceive(NotificationCenter.default.publisher(for: .omacyOpenArt)) { _ in
-                    openWindow(id: "art")
-                }
-        }
-        .defaultSize(width: 580, height: 560)
-        .windowResizability(.contentMinSize)
-        .commands {
-            CommandGroup(after: .appInfo) {
-                CheckForUpdatesCommand()
-            }
-        }
-
-        Window("Preview", id: "preview") {
-            PreviewViewRepresentable()
-                .ignoresSafeArea()
-        }
-        .defaultSize(width: 960, height: 600)
-
-        Window("Art", id: "art") {
-            ConfigView()
-        }
-        .defaultSize(width: ArtMetrics.defaultWindowWidth, height: ArtMetrics.defaultWindowHeight)
-        .windowResizability(.contentMinSize)
+    static func parse(_ url: URL) -> Self? {
+        guard url.scheme?.lowercased() == "omacy" else { return nil }
+        return url.host?.lowercased() == "art" || url.path.lowercased() == "/art" ? .workspace : nil
     }
 
-    private func handleOpenURL(_ url: URL) {
-        guard url.scheme == "omacy" else { return }
-        if url.host == "art" || url.path == "/art" {
-            openWindow(id: "art")
-        }
+    static func containsLegacyArtArgument(_ arguments: [String]) -> Bool {
+        arguments.contains("--art")
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        // Hosted XCTest launches the real app executable. Keep production-only
-        // migration, service recovery, and Sparkle startup out of that bootstrap.
-        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
-            return
-        }
+@MainActor
+final class OmacyAppServices: ObservableObject {
+    let pluginManager: PluginManager
+    let workspace: OmacyWorkspaceModel
+
+    init() {
+        OmacyHostBootstrap.migrateLegacyConfigurationIfNeeded()
+        let pluginManager = PluginManager()
+        self.pluginManager = pluginManager
+        workspace = OmacyWorkspaceModel(
+            load: OmacyStore.loadConfiguration,
+            save: OmacyStore.save,
+            bundledArt: OmacyStore.bundledArt,
+            convert: { try OmacyAsciiConverter.convert($0, settings: $1) },
+            prepareForTest: { try await pluginManager.prepareForScreenSaverTest() },
+            launch: { try await ScreenSaverLauncher().launch() }
+        )
+    }
+}
+
+enum OmacyHostBootstrap {
+    static var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    static func migrateLegacyConfigurationIfNeeded() {
+        guard !isRunningTests else { return }
         do {
             let legacyGroup = "group.be.zenjoy.omacy"
             try OmacyStore.performHostMigrationIfNeeded(
@@ -77,20 +69,105 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             )
         } catch {
-            // Migration is one-shot by design; normal loading will use public,
-            // cached, or bundled configuration without prompting again.
             NSLog("Omacy configuration migration failed: %@", error.localizedDescription)
+        }
+    }
+}
+
+@main
+@MainActor
+struct OmacyApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.openWindow) private var openWindow
+    @StateObject private var services = OmacyAppServices()
+
+    var body: some Scene {
+        Window("Omacy", id: "main") {
+            ContentView(pluginManager: services.pluginManager, workspace: services.workspace)
+                .onOpenURL { route($0) }
+                .onReceive(NotificationCenter.default.publisher(for: .omacyOpenWorkspace)) { _ in showWorkspace() }
+        }
+        .defaultSize(width: ArtMetrics.defaultWindowWidth, height: ArtMetrics.defaultWindowHeight)
+        .windowResizability(.contentMinSize)
+        .commands { CommandGroup(after: .appInfo) { CheckForUpdatesCommand() } }
+    }
+
+    private func route(_ url: URL) {
+        guard OmacyAppRoute.parse(url) != nil else { return }
+        showWorkspace()
+    }
+
+    private func showWorkspace() {
+        openWindow(id: "main")
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var windowResizeObserver: NSObjectProtocol?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !OmacyHostBootstrap.isRunningTests else { return }
+        windowResizeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            MainActor.assumeIsolated {
+                guard let window = notification.object as? NSWindow,
+                      window.title == "Omacy",
+                      window.isVisible,
+                      window.screen != nil,
+                      window.styleMask.contains(.titled),
+                      window.level == .normal,
+                      window.frame.width < OmacyWindowSizing.minimum.width
+                        || window.frame.height < OmacyWindowSizing.minimum.height else { return }
+                OmacyWindowSizing.enforce(on: window)
+            }
         }
         OmacyUpdateRecoveryLauncher.reconcileAfterLaunch()
         SparkleUpdater.shared.start()
-        if CommandLine.arguments.contains("--art") {
-            NotificationCenter.default.post(name: .omacyOpenArt, object: nil)
+        if OmacyAppRoute.containsLegacyArtArgument(CommandLine.arguments) {
+            focusWorkspace()
         }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        if urls.contains(where: { $0.scheme == "omacy" && ($0.host == "art" || $0.path == "/art") }) {
-            NotificationCenter.default.post(name: .omacyOpenArt, object: nil)
+        if urls.contains(where: { OmacyAppRoute.parse($0) != nil }) {
+            focusWorkspace()
+        }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        guard let application = notification.object as? NSApplication,
+              let window = OmacyWindowSizing.workspaceWindow(in: application) else { return }
+        OmacyWindowSizing.enforce(on: window)
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        OmacyTerminationGuard.shared.requestTermination { saved in
+            NSApp.reply(toApplicationShouldTerminate: saved)
+        }.terminateReply
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let windowResizeObserver {
+            NotificationCenter.default.removeObserver(windowResizeObserver)
+            self.windowResizeObserver = nil
+        }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { focusWorkspace() }
+        return true
+    }
+
+    private func focusWorkspace() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = NSApp.windows.first(where: { $0.title == "Omacy" }) {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            NotificationCenter.default.post(name: .omacyOpenWorkspace, object: nil)
         }
     }
 }
