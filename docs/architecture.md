@@ -20,7 +20,7 @@ OmacyRenderer (@MainActor, orchestration only)
   ├─ OmacyMetalGridRenderer      atlas, frame resources, Metal encoding
   └─ OmacyDisplayLinkDriver      main-run-loop display-link lifecycle
                     │
-Host ConfigView → OmacyAsciiConverter → image/owned-text conversion FFI
+Host OmacyWorkspaceModel → OmacyAsciiConverter → image/owned-text conversion FFI
                     │
                     ▼
  libomacy_engine.a → checked-in patched vendor/ttfx snapshot
