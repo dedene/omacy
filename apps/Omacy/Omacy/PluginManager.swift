@@ -439,13 +439,11 @@ class PluginManager: ObservableObject {
         try await paperSaver.setScreensaverEverywhere(module: paperSaverModuleName)
     }
 
-    private func inspectCurrentDisplayStatus() -> OmacyCurrentDisplayStatus {
-        let names = NSScreen.screens.map { screen -> String in
-            guard let info = paperSaver.getActiveScreensaver(for: screen) else { return "" }
-            if OmacyScreensaverIdentity.isOmacy(info.identifier) { return info.identifier }
-            return info.name
-        }
-        return .classify(names)
+    func inspectCurrentDisplayStatus() -> OmacyCurrentDisplayStatus {
+        OmacyDisplayInspector.inspectCurrentDisplayStatus(
+            screens: NSScreen.screens,
+            paperSaver: paperSaver
+        )
     }
 
     private func allowedInstallLocation() -> Bool {

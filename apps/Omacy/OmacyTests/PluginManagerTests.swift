@@ -1,4 +1,5 @@
 import XCTest
+import PaperSaverKit
 @testable import Omacy
 
 @MainActor
@@ -228,6 +229,215 @@ final class PluginManagerTests: XCTestCase {
             OmacyRegistrationState.classify([secondMissing, match], fileExists: { _ in false }),
             .missingRegistrations([match, secondMissing])
         )
+    }
+
+    func testLiveDisplayStatusWhenOptedIn() throws {
+        try XCTSkipUnless(
+            ProcessInfo.processInfo.environment["OMACY_LIVE_INTEGRATION_TESTS"] == "1",
+            "Live display status inspection requires OMACY_LIVE_INTEGRATION_TESTS=1 with signed installation and active screensaver."
+        )
+        let manager = PluginManager(processRunner: OmacyProcessRunner())
+        let status = manager.inspectCurrentDisplayStatus()
+        XCTAssertTrue(status.isActiveOnAllCurrentDisplays, "Expected active on all displays, got: \(status)")
+    }
+
+    private func makeScreensaverConfigData(relativeURL: String) throws -> Data {
+        let configDict: [String: Any] = [
+            "module": [
+                "relative": relativeURL
+            ]
+        ]
+        return try PropertyListSerialization.data(fromPropertyList: configDict, format: .binary, options: 0)
+    }
+
+    private func makeIdleDict(relativeURL: String) throws -> [String: Any] {
+        let data = try makeScreensaverConfigData(relativeURL: relativeURL)
+        return [
+            "Idle": [
+                "Content": [
+                    "Choices": [
+                        ["Configuration": data]
+                    ]
+                ]
+            ]
+        ]
+    }
+
+    func testDisplayInspectorExtractsScreensaverFromIdleConfiguration() throws {
+        let idleDict = try makeIdleDict(relativeURL: "file:///Applications/Omacy.app/Contents/PlugIns/OmacyScreensaver.appex")
+        let extracted = OmacyDisplayInspector.extractScreensaverName(from: idleDict)
+        XCTAssertEqual(extracted, "OmacyScreensaver")
+    }
+
+    func testDisplayInspectorExtractsScreensaverFromDefaultIdleConfiguration() throws {
+        let data = try makeScreensaverConfigData(relativeURL: "file:///Applications/Omacy.app/Contents/PlugIns/OmacyScreensaver.appex")
+        let nestedDict: [String: Any] = [
+            "Default": [
+                "Idle": [
+                    "Content": [
+                        "Choices": [
+                            ["Configuration": data]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+        let extracted = OmacyDisplayInspector.extractScreensaverName(from: nestedDict)
+        XCTAssertEqual(extracted, "OmacyScreensaver")
+    }
+
+    func testDisplayInspectorClassifiesEmptyScreensAsInactive() {
+        let status = OmacyDisplayInspector.inspectCurrentDisplayStatus(
+            screens: [],
+            paperSaver: PaperSaver()
+        )
+        XCTAssertEqual(status, .inactive(displayCount: 0))
+    }
+
+    func testScreensaverNameResolvesAllSpacesAndDisplaysPriority() throws {
+        let omacyDict = try makeIdleDict(relativeURL: "file:///Applications/Omacy.app/Contents/PlugIns/OmacyScreensaver.appex")
+        let flurryDict = try makeIdleDict(relativeURL: "/System/Library/Screen Savers/Flurry.saver")
+
+        let mockPlist: [String: Any] = [
+            "AllSpacesAndDisplays": omacyDict,
+            "Displays": [
+                "DISPLAY-1": flurryDict
+            ]
+        ]
+
+        let name = OmacyDisplayInspector.screensaverName(
+            forDisplayUUID: "DISPLAY-1",
+            wallpaperPlist: mockPlist,
+            spaceTree: nil
+        )
+        XCTAssertEqual(name, "OmacyScreensaver")
+    }
+
+    func testScreensaverNameResolvesCurrentSpaceFromSpaceTree() throws {
+        let omacyDict = try makeIdleDict(relativeURL: "file:///Applications/Omacy.app/Contents/PlugIns/OmacyScreensaver.appex")
+        let otherDict = try makeIdleDict(relativeURL: "/System/Library/Screen Savers/Flurry.saver")
+
+        let mockPlist: [String: Any] = [
+            "Spaces": [
+                "SPACE-CURRENT": omacyDict,
+                "SPACE-OTHER": otherDict
+            ]
+        ]
+
+        let mockTree: [String: Any] = [
+            "monitors": [
+                [
+                    "uuid": "DISPLAY-1",
+                    "spaces": [
+                        ["uuid": "SPACE-CURRENT", "is_current": true],
+                        ["uuid": "SPACE-OTHER", "is_current": false]
+                    ]
+                ]
+            ]
+        ]
+
+        let name = OmacyDisplayInspector.screensaverName(
+            forDisplayUUID: "DISPLAY-1",
+            wallpaperPlist: mockPlist,
+            spaceTree: mockTree
+        )
+        XCTAssertEqual(name, "OmacyScreensaver")
+    }
+
+    func testScreensaverNameResolvesDisplaysDictionaryWhenSpaceNotFound() throws {
+        let omacyDict = try makeIdleDict(relativeURL: "file:///Applications/Omacy.app/Contents/PlugIns/OmacyScreensaver.appex")
+
+        let mockPlist: [String: Any] = [
+            "Displays": [
+                "DISPLAY-1": omacyDict
+            ]
+        ]
+
+        let name = OmacyDisplayInspector.screensaverName(
+            forDisplayUUID: "DISPLAY-1",
+            wallpaperPlist: mockPlist,
+            spaceTree: nil
+        )
+        XCTAssertEqual(name, "OmacyScreensaver")
+    }
+
+    func testScreensaverNameResolvesSystemDefaultFallback() throws {
+        let omacyDict = try makeIdleDict(relativeURL: "file:///Applications/Omacy.app/Contents/PlugIns/OmacyScreensaver.appex")
+
+        let mockPlist: [String: Any] = [
+            "SystemDefault": omacyDict
+        ]
+
+        let name = OmacyDisplayInspector.screensaverName(
+            forDisplayUUID: "DISPLAY-UNKNOWN",
+            wallpaperPlist: mockPlist,
+            spaceTree: nil
+        )
+        XCTAssertEqual(name, "OmacyScreensaver")
+    }
+
+    func testScreensaverNameReturnsNilWhenNoMatchingConfig() {
+        let name = OmacyDisplayInspector.screensaverName(
+            forDisplayUUID: "DISPLAY-1",
+            wallpaperPlist: [:],
+            spaceTree: nil
+        )
+        XCTAssertNil(name)
+    }
+
+    func testInspectDisplayStatusClassifiesMultipleDisplaysDeterministically() throws {
+        let omacyDict = try makeIdleDict(relativeURL: "file:///Applications/Omacy.app/Contents/PlugIns/OmacyScreensaver.appex")
+        let flurryDict = try makeIdleDict(relativeURL: "/System/Library/Screen Savers/Flurry.saver")
+
+        // 1. All displays active
+        let allActivePlist: [String: Any] = [
+            "Displays": [
+                "DISP-1": omacyDict,
+                "DISP-2": omacyDict
+            ]
+        ]
+        let allStatus = OmacyDisplayInspector.inspectDisplayStatus(
+            displayUUIDs: ["DISP-1", "DISP-2"],
+            wallpaperPlist: allActivePlist,
+            spaceTree: nil
+        )
+        XCTAssertEqual(allStatus, .activeOnAll(displayCount: 2))
+
+        // 2. Some displays active
+        let someActivePlist: [String: Any] = [
+            "Displays": [
+                "DISP-1": omacyDict,
+                "DISP-2": flurryDict
+            ]
+        ]
+        let someStatus = OmacyDisplayInspector.inspectDisplayStatus(
+            displayUUIDs: ["DISP-1", "DISP-2"],
+            wallpaperPlist: someActivePlist,
+            spaceTree: nil
+        )
+        XCTAssertEqual(someStatus, .activeOnSome(activeCount: 1, displayCount: 2))
+
+        // 3. Inactive on all
+        let noneActivePlist: [String: Any] = [
+            "Displays": [
+                "DISP-1": flurryDict,
+                "DISP-2": flurryDict
+            ]
+        ]
+        let noneStatus = OmacyDisplayInspector.inspectDisplayStatus(
+            displayUUIDs: ["DISP-1", "DISP-2"],
+            wallpaperPlist: noneActivePlist,
+            spaceTree: nil
+        )
+        XCTAssertEqual(noneStatus, .inactive(displayCount: 2))
+
+        // 4. Empty displays
+        let emptyStatus = OmacyDisplayInspector.inspectDisplayStatus(
+            displayUUIDs: [],
+            wallpaperPlist: allActivePlist,
+            spaceTree: nil
+        )
+        XCTAssertEqual(emptyStatus, .inactive(displayCount: 0))
     }
 
     func testCurrentDisplayClassificationUsesEveryDisplayAndCentralAliases() {

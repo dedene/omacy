@@ -92,6 +92,7 @@
 		1AW0000A000000000000000A /* OmacyAppRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AW0000A000000000000000B /* OmacyAppRouteTests.swift */; };
 		1AW0000B000000000000000A /* OmacyTerminationGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AW0000B000000000000000B /* OmacyTerminationGuard.swift */; };
 		1AW0000C000000000000000A /* OmacyTerminationGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AW0000C000000000000000B /* OmacyTerminationGuardTests.swift */; };
+		1AW0000D000000000000000A /* OmacyDisplayInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AW0000D000000000000000B /* OmacyDisplayInspector.swift */; };
 		1AS00001000000000000000A /* OmacyProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AS00001000000000000000B /* OmacyProcessRunner.swift */; };
 		1AS00002000000000000000A /* OmacyProcessRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AS00002000000000000000B /* OmacyProcessRunnerTests.swift */; };
 /* End PBXBuildFile section */
@@ -199,6 +200,7 @@
 		1AW0000A000000000000000B /* OmacyAppRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyAppRouteTests.swift; sourceTree = "<group>"; };
 		1AW0000B000000000000000B /* OmacyTerminationGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyTerminationGuard.swift; sourceTree = "<group>"; };
 		1AW0000C000000000000000B /* OmacyTerminationGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyTerminationGuardTests.swift; sourceTree = "<group>"; };
+		1AW0000D000000000000000B /* OmacyDisplayInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyDisplayInspector.swift; sourceTree = "<group>"; };
 		1AS00001000000000000000B /* OmacyProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyProcessRunner.swift; sourceTree = "<group>"; };
 		1AS00002000000000000000B /* OmacyProcessRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyProcessRunnerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -260,6 +262,7 @@
 				1AW00005000000000000000B /* OmacyWorkspaceView.swift */,
 				1AW00006000000000000000B /* OmacyWindowCloseGuard.swift */,
 				1AW0000B000000000000000B /* OmacyTerminationGuard.swift */,
+				1AW0000D000000000000000B /* OmacyDisplayInspector.swift */,
 				1AS00001000000000000000B /* OmacyProcessRunner.swift */,
 				1A000083000000000000000B /* SparkleUpdater.swift */,
 				1A000002000000000000000B /* ContentView.swift */,
@@ -584,6 +587,7 @@
 				1AW00005000000000000000A /* OmacyWorkspaceView.swift in Sources */,
 				1AW00006000000000000000A /* OmacyWindowCloseGuard.swift in Sources */,
 				1AW0000B000000000000000A /* OmacyTerminationGuard.swift in Sources */,
+				1AW0000D000000000000000A /* OmacyDisplayInspector.swift in Sources */,
 				1AS00001000000000000000A /* OmacyProcessRunner.swift in Sources */,
 				1AA00001000000000000000A /* OmacyAsciiConverter.swift in Sources */,
 				1A000001000000000000000A /* OmacyApp.swift in Sources */,
