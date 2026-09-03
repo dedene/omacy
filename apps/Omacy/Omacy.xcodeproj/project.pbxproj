@@ -93,6 +93,10 @@
 		1AW0000B000000000000000A /* OmacyTerminationGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AW0000B000000000000000B /* OmacyTerminationGuard.swift */; };
 		1AW0000C000000000000000A /* OmacyTerminationGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AW0000C000000000000000B /* OmacyTerminationGuardTests.swift */; };
 		1AW0000D000000000000000A /* OmacyDisplayInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AW0000D000000000000000B /* OmacyDisplayInspector.swift */; };
+		1AD00001000000000000000A /* OmacyDisplayCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AD00001000000000000000B /* OmacyDisplayCoordinator.swift */; };
+		1AD00002000000000000000A /* OmacyDisplayCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AD00001000000000000000B /* OmacyDisplayCoordinator.swift */; };
+		1AD00003000000000000000A /* OmacyDisplayCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AD00003000000000000000B /* OmacyDisplayCoordinatorTests.swift */; };
+		1AD00004000000000000000A /* OmacyRendererIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AD00004000000000000000B /* OmacyRendererIntegrationTests.swift */; };
 		1AS00001000000000000000A /* OmacyProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AS00001000000000000000B /* OmacyProcessRunner.swift */; };
 		1AS00002000000000000000A /* OmacyProcessRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AS00002000000000000000B /* OmacyProcessRunnerTests.swift */; };
 /* End PBXBuildFile section */
@@ -201,6 +205,9 @@
 		1AW0000B000000000000000B /* OmacyTerminationGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyTerminationGuard.swift; sourceTree = "<group>"; };
 		1AW0000C000000000000000B /* OmacyTerminationGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyTerminationGuardTests.swift; sourceTree = "<group>"; };
 		1AW0000D000000000000000B /* OmacyDisplayInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyDisplayInspector.swift; sourceTree = "<group>"; };
+		1AD00001000000000000000B /* OmacyDisplayCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyDisplayCoordinator.swift; sourceTree = "<group>"; };
+		1AD00003000000000000000B /* OmacyDisplayCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyDisplayCoordinatorTests.swift; sourceTree = "<group>"; };
+		1AD00004000000000000000B /* OmacyRendererIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyRendererIntegrationTests.swift; sourceTree = "<group>"; };
 		1AS00001000000000000000B /* OmacyProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyProcessRunner.swift; sourceTree = "<group>"; };
 		1AS00002000000000000000B /* OmacyProcessRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OmacyProcessRunnerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -313,6 +320,7 @@
 				1A000090000000000000000B /* OmacyRenderer.swift */,
 				1AR00001000000000000000B /* OmacyMetalGridRenderer.swift */,
 				1AR00002000000000000000B /* OmacyDisplayLinkDriver.swift */,
+				1AD00001000000000000000B /* OmacyDisplayCoordinator.swift */,
 				1AR00004000000000000000B /* OmacyPinnedPreviewState.swift */,
 				1AR00006000000000000000B /* OmacyTransitionCoordinator.swift */,
 				1AF00002000000000000000B /* OmacyFrameResources.swift */,
@@ -343,6 +351,8 @@
 				1AS00002000000000000000B /* OmacyProcessRunnerTests.swift */,
 				1AA00002000000000000000B /* OmacyAsciiConverterTests.swift */,
 				1AR00003000000000000000B /* OmacyDisplayLinkDriverTests.swift */,
+				1AD00003000000000000000B /* OmacyDisplayCoordinatorTests.swift */,
+				1AD00004000000000000000B /* OmacyRendererIntegrationTests.swift */,
 				1AR00005000000000000000B /* OmacyPinnedPreviewStateTests.swift */,
 				1AT00001000000000000000B /* OmacyLayoutTests.swift */,
 				1AT00002000000000000000B /* OmacyQuadsTests.swift */,
@@ -572,6 +582,8 @@
 				1AF00001000000000000000A /* OmacyFrameResourcesTests.swift in Sources */,
 				1AE00003000000000000000A /* OmacyEngineSessionTests.swift in Sources */,
 				1AR00005000000000000000A /* OmacyDisplayLinkDriverTests.swift in Sources */,
+				1AD00003000000000000000A /* OmacyDisplayCoordinatorTests.swift in Sources */,
+				1AD00004000000000000000A /* OmacyRendererIntegrationTests.swift in Sources */,
 				1AR00008000000000000000A /* OmacyPinnedPreviewStateTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -597,6 +609,7 @@
 				1A000066000000000000000A /* Logger.swift in Sources */,
 				1A0000A0000000000000000A /* OmacyRenderer.swift in Sources */,
 				1AR00001000000000000000A /* OmacyMetalGridRenderer.swift in Sources */,
+				1AD00001000000000000000A /* OmacyDisplayCoordinator.swift in Sources */,
 				1AR00003000000000000000A /* OmacyDisplayLinkDriver.swift in Sources */,
 				1AR00006000000000000000A /* OmacyPinnedPreviewState.swift in Sources */,
 				1AR00009000000000000000A /* OmacyTransitionCoordinator.swift in Sources */,
@@ -629,6 +642,7 @@
 				1A0000B7000000000000000A /* OmacyCanaryAnimator.swift in Sources */,
 				1A0000A1000000000000000A /* OmacyRenderer.swift in Sources */,
 				1AR00002000000000000000A /* OmacyMetalGridRenderer.swift in Sources */,
+				1AD00002000000000000000A /* OmacyDisplayCoordinator.swift in Sources */,
 				1AR00004000000000000000A /* OmacyDisplayLinkDriver.swift in Sources */,
 				1AR00007000000000000000A /* OmacyPinnedPreviewState.swift in Sources */,
 				1AR0000A000000000000000A /* OmacyTransitionCoordinator.swift in Sources */,

@@ -15,6 +15,7 @@ Companion contracts: [FFI](ffi.md), [parity](parity.md), [macOS gates](macos-gat
                     │ immutable snapshot
                     ▼
 OmacyRenderer (@MainActor, orchestration only)
+  ├─ OmacyDisplayCoordinator    in-process barrier sync and shared effect shuffle
   ├─ OmacyTransitionCoordinator  transactional state + retry identities
   ├─ OmacyEngineSession          session-lifecycle C pointers and statuses
   ├─ OmacyMetalGridRenderer      atlas, frame resources, Metal encoding
@@ -26,7 +27,9 @@ Host OmacyWorkspaceModel → OmacyAsciiConverter → image/owned-text conversion
  libomacy_engine.a → checked-in patched vendor/ttfx snapshot
 ```
 
-`OmacyHostView` embeds the renderer in the app. `OmacySaverView` embeds the same renderer in the extension. Each fullscreen saver view owns an independent session, so displays choose and advance effects independently.
+`OmacyHostView` embeds the renderer in the app. `OmacySaverView` embeds the same renderer in the extension. In macOS ExtensionKit (`com.apple.screensaver`), all displays run within a single screensaver extension process. When `syncDisplays` is enabled (default), `OmacyDisplayCoordinator` synchronizes effect selection and enforces a barrier transition across all active displays, dwelling on completed ASCII art together before starting the next effect simultaneously. The next start epoch is published only after every remaining engine commits, and renderers derive their fixed 60 Hz step index from that absolute epoch so different display-link cadences cannot introduce rounding drift. They debit only the steps the engine actually accepts, preserving any backlog across the engine's per-call step limit.
+
+One random base seed is created per active display group; cycle `n` uses the wrapping sum `baseSeed + n`. A renderer that joins late starts with the current cycle seed and therefore matches the continuous engine stream at the next shared boundary. Changing synchronization mode recreates the session because the seed is a creation-only FFI input. If an engine rejects a coordinated transition permanently, only that renderer unregisters and falls back to the canary while the remaining renderers finish the transaction. A participant that misses the safety timeout is removed from that transaction; when it resumes behind the coordinator, its engine session is recreated directly at the current cycle and seed. When `syncDisplays` is disabled, displays choose and advance effects independently.
 
 Production supports Apple silicon only (`arm64`, macOS 15 or later). Debug and Release pin `ARCHS = arm64` in the checked-in Xcode project, and the Rust build phase rejects any input other than one exact `arm64` architecture before invoking Cargo.
 

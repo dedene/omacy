@@ -246,6 +246,8 @@ struct OmacyWorkspaceView: View {
             Section("Look") {
                 ColorPicker("Background", selection: backgroundBinding, supportsOpacity: false)
                 Stepper("Font size \(Int(model.editor.draftSettings.fontSize)) pt", value: settingsBinding(\.fontSize), in: 8...OmacySettingsCodec.maximumFontSize)
+                Toggle("Sync Displays", isOn: settingsBinding(\.syncDisplays))
+                    .help("Synchronize screensaver effects across all connected displays.")
             }
             Section { DisclosureGroup("Details", isExpanded: $detailsExpanded) { systemDetails } }
             Section {

@@ -177,6 +177,7 @@ final class OmacySaverView: ScreenSaverView {
             needsDisplay = true
             return
         }
+        renderer.displayCoordinator = OmacyDisplayCoordinator.shared
         switch renderer.attach(to: self, isPreview: false) {
         case .engine:
             usingCanary = false
@@ -247,6 +248,7 @@ final class OmacySaverView: ScreenSaverView {
         settledFallback = nil
         unobserveScreen()
         renderer.stop()
+        renderer.displayCoordinator = nil
         canary.stop()
     }
 

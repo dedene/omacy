@@ -64,11 +64,27 @@ struct OmacyEngineConfiguration: Equatable {
     let initialEffect: String
     let effects: [String]
     let background: (UInt8, UInt8, UInt8, UInt8)
+    let seed: UInt64?
+
+    init(
+        art: String,
+        initialEffect: String,
+        effects: [String],
+        background: (UInt8, UInt8, UInt8, UInt8),
+        seed: UInt64? = nil
+    ) {
+        self.art = art
+        self.initialEffect = initialEffect
+        self.effects = effects
+        self.background = background
+        self.seed = seed
+    }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.art == rhs.art && lhs.initialEffect == rhs.initialEffect && lhs.effects == rhs.effects
             && lhs.background.0 == rhs.background.0 && lhs.background.1 == rhs.background.1
             && lhs.background.2 == rhs.background.2 && lhs.background.3 == rhs.background.3
+            && lhs.seed == rhs.seed
     }
 }
 
@@ -333,6 +349,13 @@ func withOmacySessionConfig<Result>(
                 config.bg_g = configuration.background.1
                 config.bg_b = configuration.background.2
                 config.bg_a = configuration.background.3
+                if let seed = configuration.seed {
+                    config.has_seed = 1
+                    config.seed = seed
+                } else {
+                    config.has_seed = 0
+                    config.seed = 0
+                }
                 return withUnsafePointer(to: &config, body)
             }
         }

@@ -57,6 +57,7 @@ final class OmacySettingsTests: XCTestCase {
             "asciiMode": "braille",
             "threshold": 75,
             "invert": true,
+            "syncDisplays": false,
         ])
 
         let decoded = OmacyStore.decodeSettings(data, lastGood: OmacySettings())
@@ -68,7 +69,37 @@ final class OmacySettingsTests: XCTestCase {
         XCTAssertEqual(decoded.settings.asciiMode, "braille")
         XCTAssertEqual(decoded.settings.threshold, 75)
         XCTAssertTrue(decoded.settings.invert)
+        XCTAssertFalse(decoded.settings.syncDisplays)
         XCTAssertNil(decoded.error)
+    }
+
+    func testDecodeSettingsSupportsSyncDisplays() throws {
+        let enabled = OmacyStore.decodeSettings(try json(["syncDisplays": true]), lastGood: OmacySettings())
+        XCTAssertTrue(enabled.settings.syncDisplays)
+
+        let disabled = OmacyStore.decodeSettings(try json(["syncDisplays": false]), lastGood: OmacySettings())
+        XCTAssertFalse(disabled.settings.syncDisplays)
+
+        let missing = OmacyStore.decodeSettings(try json([:]), lastGood: OmacySettings())
+        XCTAssertTrue(missing.settings.syncDisplays)
+    }
+
+    func testEncodeSettingsIncludesSyncDisplays() throws {
+        var settings = OmacySettings()
+        settings.syncDisplays = false
+        let data = try OmacySettingsCodec.encode(settings)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        XCTAssertEqual(json?["syncDisplays"] as? Bool, false)
+    }
+
+    func testDecodeValidatedRejectsNonBooleanSyncDisplays() throws {
+        let invalidString = try json(["syncDisplays": "false"])
+        let invalidNumber = try json(["syncDisplays": 1])
+        let valid = try json(["syncDisplays": false])
+
+        XCTAssertNil(OmacySettingsCodec.decodeValidated(invalidString))
+        XCTAssertNil(OmacySettingsCodec.decodeValidated(invalidNumber))
+        XCTAssertNotNil(OmacySettingsCodec.decodeValidated(valid))
     }
 
     func testSanitizeDropsUnknownAndDuplicateEffectsWhileKeepingOrder() {

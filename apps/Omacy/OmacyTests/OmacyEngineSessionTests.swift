@@ -267,6 +267,26 @@ final class OmacyEngineSessionTests: XCTestCase {
         XCTAssertEqual(received, ["beams", "wipe"])
     }
 
+    func testSessionConfigBridgePreservesOptionalSeed() {
+        let seeded = OmacyEngineConfiguration(
+            art: "ART", initialEffect: "beams", effects: ["beams"],
+            background: (1, 2, 3, 255), seed: 98_765
+        )
+        withOmacySessionConfig(seeded) { pointer in
+            XCTAssertEqual(pointer.pointee.has_seed, 1)
+            XCTAssertEqual(pointer.pointee.seed, 98_765)
+        }
+
+        let unseeded = OmacyEngineConfiguration(
+            art: "ART", initialEffect: "beams", effects: ["beams"],
+            background: (1, 2, 3, 255)
+        )
+        withOmacySessionConfig(unseeded) { pointer in
+            XCTAssertEqual(pointer.pointee.has_seed, 0)
+            XCTAssertEqual(pointer.pointee.seed, 0)
+        }
+    }
+
     private func withCatalogStorage<Result>(
         _ names: [[UInt8]],
         body: (OmacyEffectCatalog.API) throws -> Result

@@ -18,7 +18,7 @@ art_tmp=$(mktemp "$config_dir/.screensaver.txt.XXXXXX")
 settings_tmp=$(mktemp "$config_dir/.settings.json.XXXXXX")
 
 printf '  /\\_/\\\n ( o.o )\n  > ^ <\n' > "$art_tmp"
-printf '%s\n' '{"effect":"random","effects":["beams","wipe"],"background":"#000000","fontSize":18,"asciiMode":"block","threshold":50,"invert":false}' > "$settings_tmp"
+printf '%s\n' '{"effect":"random","effects":["beams","wipe"],"background":"#000000","fontSize":18,"asciiMode":"block","threshold":50,"invert":false,"syncDisplays":true}' > "$settings_tmp"
 
 mv -f "$settings_tmp" "$config_dir/settings.json"
 mv -f "$art_tmp" "$config_dir/screensaver.txt"
@@ -47,5 +47,6 @@ spray swarm sweep synthgrid thunderstorm unstable vhstape waves wipe
 ```
 
 Other validated fields are `background` (`#RRGGBB`), positive `fontSize`, `asciiMode`
-(`block` or `braille`), `threshold` (`0...100`), and boolean `invert`. Omacy's Art window uses
-the same engine-provided catalog and schema as external writers.
+(`block` or `braille`), `threshold` (`0...100`), boolean `invert`, and boolean `syncDisplays`
+(default `true` to keep all connected screens on the same effect and transition barrier).
+Omacy's Art window uses the same engine-provided catalog and schema as external writers.

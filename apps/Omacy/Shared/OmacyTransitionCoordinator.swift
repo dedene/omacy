@@ -70,21 +70,28 @@ final class OmacyTransitionCoordinator {
         pinned.shouldRetry(content: content, rejectedIdentityMatches: rejection.rejects(identity), canRun: canRun)
     }
 
-    func engineConfiguration(settings: OmacySettings, art: String) -> OmacyEngineConfiguration {
+    func engineConfiguration(settings: OmacySettings, art: String, seed: UInt64? = nil) -> OmacyEngineConfiguration {
         OmacyEngineConfiguration(
             art: art, initialEffect: settings.engineEffect,
-            effects: OmacyEffects.sanitize(settings.effects), background: settings.backgroundRGBA
+            effects: OmacyEffects.sanitize(settings.effects), background: settings.backgroundRGBA,
+            seed: seed
         )
     }
 
-    func semanticIdentity(settings: OmacySettings, art: String) -> String {
-        [settings.effects.joined(separator: "\u{1f}"), settings.background, String(settings.fontSize),
-         settings.asciiMode, String(settings.threshold), String(settings.invert), art].joined(separator: "\u{1e}")
+    func semanticIdentity(settings: OmacySettings, art: String, seed: UInt64? = nil) -> String {
+        var components = [
+            settings.effects.joined(separator: "\u{1f}"), settings.background, String(settings.fontSize),
+            settings.asciiMode, String(settings.threshold), String(settings.invert), String(settings.syncDisplays), art
+        ]
+        if let seed {
+            components.append(String(seed))
+        }
+        return components.joined(separator: "\u{1e}")
     }
 
-    func replacementIdentity(settings: OmacySettings, art: String, cols: UInt32, rows: UInt32) -> String {
+    func replacementIdentity(settings: OmacySettings, art: String, cols: UInt32, rows: UInt32, seed: UInt64? = nil) -> String {
         OmacyReplacementRejectionLatch.identity(
-            semanticConfiguration: semanticIdentity(settings: settings, art: art), cols: cols, rows: rows
+            semanticConfiguration: semanticIdentity(settings: settings, art: art, seed: seed), cols: cols, rows: rows
         )
     }
 
@@ -98,14 +105,14 @@ final class OmacyTransitionCoordinator {
         return OmacyLayout.fittingFontSize(art: art, in: view.bounds.size, cap: cap)
     }
 
-    func boundaryPlan(settings: OmacySettings, art: String, cols: UInt32, rows: UInt32) -> OmacyBoundaryPlan {
+    func boundaryPlan(settings: OmacySettings, art: String, cols: UInt32, rows: UInt32, seed: UInt64? = nil) -> OmacyBoundaryPlan {
         OmacyBoundaryPlan(
             settings: settings,
             art: art,
-            configuration: engineConfiguration(settings: settings, art: art),
+            configuration: engineConfiguration(settings: settings, art: art, seed: seed),
             cols: cols,
             rows: rows,
-            identity: replacementIdentity(settings: settings, art: art, cols: cols, rows: rows)
+            identity: replacementIdentity(settings: settings, art: art, cols: cols, rows: rows, seed: seed)
         )
     }
 

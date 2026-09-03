@@ -50,6 +50,7 @@ struct OmacySettings: Equatable {
     var asciiMode: String = "block"
     var threshold: Int = 50
     var invert: Bool = false
+    var syncDisplays: Bool = true
 
     func engineEffect(catalog: OmacyEffectCatalog = .live) -> String {
         let selected = OmacyEffects.sanitize(effects, catalog: catalog)
@@ -98,6 +99,7 @@ enum OmacySettingsCodec {
             if let value = object["asciiMode"] as? String { settings.asciiMode = value }
             if let value = object["threshold"] as? Int { settings.threshold = value }
             if let value = object["invert"] as? Bool { settings.invert = value }
+            if let value = object["syncDisplays"] as? Bool { settings.syncDisplays = value }
             if let effects = object["effects"] as? [String] {
                 settings.effects = OmacyEffects.sanitize(effects, catalog: catalog)
             } else if settings.effect == "random" || settings.effect.isEmpty {
@@ -131,7 +133,7 @@ enum OmacySettingsCodec {
             "effect": settings.effect, "effects": settings.effects,
             "background": settings.background, "fontSize": settings.fontSize,
             "asciiMode": settings.asciiMode, "threshold": settings.threshold,
-            "invert": settings.invert
+            "invert": settings.invert, "syncDisplays": settings.syncDisplays
         ]
         return try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
     }
@@ -164,8 +166,13 @@ enum OmacySettingsCodec {
             guard !(value is Bool), let threshold = value as? Int,
                   (0...100).contains(threshold) else { return false }
         }
-        if let value = object["invert"], !(value is Bool) { return false }
+        if let value = object["invert"], !isJSONBool(value) { return false }
+        if let value = object["syncDisplays"], !isJSONBool(value) { return false }
         return true
+    }
+
+    private static func isJSONBool(_ value: Any) -> Bool {
+        CFGetTypeID(value as CFTypeRef) == CFBooleanGetTypeID()
     }
 
     private static func hasAcceptableNesting(_ data: Data) -> Bool {
